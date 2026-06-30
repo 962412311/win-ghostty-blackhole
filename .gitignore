@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+
+# External reference checkout used by the verifier.
+ghostty-blackhole-src/

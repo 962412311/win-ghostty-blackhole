@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo="/mnt/i/QtWorkData/MyTools/my_ghostty_blackhole"
+supervisor="$repo/blackhole-windows-terminal/codex-blackhole-supervisor.js"
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "node not found" >&2
+  exit 127
+fi
+
+mode="${1:-codex}"
+case "$mode" in
+  auto)
+    shift || true
+    exec node "$repo/blackhole-windows-terminal/bh-mode.js" open-codex "$@"
+    ;;
+  demo|token|tokens|pomodoro|mode|status|current)
+    exec node "$repo/blackhole-windows-terminal/bh-mode.js" "$mode" --open
+    ;;
+  codex)
+    shift || true
+    exec node "$repo/blackhole-windows-terminal/bh-mode.js" open-codex "$@"
+    ;;
+  __run_codex)
+    shift || true
+    ;;
+  help|--help|-h)
+    cat <<'EOF'
+Usage:
+  bh demo       Install demo shader and open a new Blackhole tab.
+  bh token      Install token shader and open a new Blackhole tab.
+  bh pomodoro   Install pomodoro shader and open a new Blackhole tab.
+  bh mode       Print the installed shader path and last requested mode.
+  bh            Open a new Blackhole tab running WSL Codex.
+  bh codex      Open a new Blackhole tab running WSL Codex.
+EOF
+    exit 0
+    ;;
+  claude)
+    echo "Claude mode is Windows-native. Run bh or bh claude from the Blackhole cmd profile." >&2
+    exit 2
+    ;;
+  *)
+    echo "Unknown mode: $mode" >&2
+    echo "Usage: bh [codex]" >&2
+    exit 2
+    ;;
+esac
+
+node "$repo/blackhole-windows-terminal/bh-mode.js" token >/dev/null
+exec node "$supervisor" "$@"
