@@ -244,6 +244,14 @@ float tokenFromRgb(float3 c)
     int3 v = int3(floor(saturate(c) * 255.0 + 0.5));
     int3 hi = v / 16;
     int3 lo = v - hi * 16;
+
+    if (hi.x == 0x0 && hi.y == 0x0 && hi.z == 0x0)
+    {
+        if (lo.x != (lo.y ^ lo.z ^ 0x5)) return -1.0;
+        int hiddenFill = lo.y * 16 + lo.z;
+        return hiddenFill > 250 ? -1.0 : float(hiddenFill) / 250.0;
+    }
+
     if (hi.x != 0xF || hi.y != 0xB || hi.z != 0x0) return -1.0;
     if (lo.x != (lo.y ^ lo.z ^ 0x5)) return -1.0;
     int fill = lo.y * 16 + lo.z;

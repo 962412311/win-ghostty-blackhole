@@ -65,8 +65,8 @@ function encodeLevel(level) {
   const chk = (hi ^ lo ^ 0x5) & 0xf;
   return {
     fill,
-    r: 0xf0 + chk,
-    g: 0xb0 + hi,
+    r: chk,
+    g: hi,
     b: lo,
   };
 }
@@ -74,6 +74,10 @@ function encodeLevel(level) {
 function ansiBlock(level) {
   const { r, g, b } = encodeLevel(level);
   return `${ESC}[48;2;${r};${g};${b}m          ${ESC}[0m`;
+}
+
+function beaconSequence(level) {
+  return `${ESC}7${ESC}[999;1H${ansiBlock(level)}${ESC}8`;
 }
 
 function bar(level, width) {
@@ -215,7 +219,7 @@ function codexLevel(input) {
 }
 
 function writeBeacon(level) {
-  const seq = `${ESC}7${ESC}[999;1H${ansiBlock(level)}${ESC}8`;
+  const seq = beaconSequence(level);
   try {
     fs.writeFileSync('/dev/tty', seq);
     return;
@@ -261,6 +265,9 @@ if (mode === 'claude-statusline') {
 } else if (mode === 'encode-test') {
   const level = levelFromPercent(process.argv[3] ?? '0');
   process.stdout.write(`${ansiBlock(level >= 0.0 ? level : 0.0)}\n`);
+} else if (mode === 'beacon-test') {
+  const level = levelFromPercent(process.argv[3] ?? '0');
+  process.stdout.write(beaconSequence(level >= 0.0 ? level : 0.0));
 } else {
   process.stderr.write(`unknown mode: ${mode}\n`);
   process.exit(2);

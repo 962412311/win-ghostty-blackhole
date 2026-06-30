@@ -38,7 +38,7 @@ EOF
     exit 0
     ;;
   claude)
-    echo "Claude mode is Windows-native. Run bh or bh claude from the Blackhole cmd profile." >&2
+    echo "Claude Code blackhole mode is disabled. Run claude normally, without bh." >&2
     exit 2
     ;;
   *)

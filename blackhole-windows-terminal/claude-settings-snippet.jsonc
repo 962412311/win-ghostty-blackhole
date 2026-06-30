@@ -1,11 +1,5 @@
-// For Claude Code token-driven mode:
-// 1) In blackhole_winterminal.hlsl, set: #define SIZE_MODE MODE_TOKENS
-// 2) Put blackhole-statusline.js and claude-blackhole-statusline.cmd in C:/Users/YOUR_USER/.claude/
-// 3) Add this to C:/Users/YOUR_USER/.claude/settings.json
-{
-  "statusLine": {
-    "type": "command",
-    "command": "cmd /d /c C:\\Users\\YOUR_USER\\.claude\\claude-blackhole-statusline.cmd",
-    "padding": 0
-  }
-}
+// 已废弃。
+// 不要在 Windows 原生 cmd 的 Claude Code 中为此 shader 启用 statusLine。
+// Claude Code 2.1.196 会把 statusLine JSON 泄漏到 cmd 提示符中，
+// 不能稳定通过配置命令消费 stdin。
+{}

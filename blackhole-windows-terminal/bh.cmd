@@ -6,9 +6,9 @@ set "MODE=%~1"
 set "SKIP_FIRST=0"
 
 if "%MODE%"=="" (
-  set "MODE=claude"
+  set "MODE=codex"
 ) else if /I "%MODE%"=="auto" (
-  set "MODE=claude"
+  set "MODE=codex"
   set "SKIP_FIRST=1"
 ) else if /I "%MODE%"=="demo" (
   goto run_mode
@@ -62,8 +62,9 @@ node "%TOOL_DIR%bh-mode.js" %MODE% --open
 exit /b %ERRORLEVEL%
 
 :run_claude
-node "%TOOL_DIR%bh-mode.js" open-claude %BH_ARGS%
-exit /b %ERRORLEVEL%
+echo Claude Code blackhole mode is disabled on Windows because Claude leaks statusLine JSON into cmd.
+echo Use bh codex for the blackhole effect, or run claude normally without bh.
+exit /b 2
 
 :run_claude_inplace
 node "%TOOL_DIR%bh-mode.js" token >nul
@@ -96,8 +97,8 @@ echo   bh demo        Install demo shader and open a new Blackhole tab.
 echo   bh token       Install token shader and open a new Blackhole tab.
 echo   bh pomodoro    Install pomodoro shader and open a new Blackhole tab.
 echo   bh mode        Print the installed shader path and last requested mode.
-echo   bh             Open a new Blackhole tab running Windows Claude Code.
-echo   bh claude      Open a new Blackhole tab running Windows Claude Code.
+echo   bh             Open a new Blackhole tab running WSL Codex.
+echo   bh claude      Disabled: run claude normally, without blackhole.
 echo   bh codex       Open a new Blackhole tab running WSL Codex.
 exit /b 0
 
