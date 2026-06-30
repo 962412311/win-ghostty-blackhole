@@ -149,6 +149,13 @@ function sqliteRows(sql) {
   }
 }
 
+function threadStartClause() {
+  const startedAtMs = asNumber(process.env.CODEX_BLACKHOLE_STARTED_AT_MS);
+  if (startedAtMs === null) return '';
+  const threshold = Math.max(0, Math.floor(startedAtMs - 5000));
+  return ` and coalesce(created_at_ms, created_at * 1000) >= ${threshold} `;
+}
+
 function readTail(filePath, maxBytes) {
   let fd = null;
   try {
@@ -186,17 +193,20 @@ function rolloutLevel(rolloutPath) {
 
 function latestThreadRowsForCwd(cwd) {
   const columns = 'rollout_path,cwd,tokens_used,model';
+  const startedAfter = threadStartClause();
   if (cwd) {
     const rows = sqliteRows(
       `select ${columns} from threads ` +
       `where archived = 0 and lower(cwd) = lower(${sqlString(cwd)}) ` +
+      startedAfter +
       'order by updated_at_ms desc, updated_at desc limit 1;',
     );
     if (rows.length > 0) return rows;
   }
   return sqliteRows(
     `select ${columns} from threads ` +
-    'where archived = 0 order by updated_at_ms desc, updated_at desc limit 1;',
+    `where archived = 0 ${startedAfter} ` +
+    'order by updated_at_ms desc, updated_at desc limit 1;',
   );
 }
 
