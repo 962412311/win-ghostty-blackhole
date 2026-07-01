@@ -5,15 +5,12 @@ Windows Terminal 黑洞像素着色器项目。核心 shader 基于原仓库
 中的 Ghostty blackhole shader 源码移植；`ghostty-blackhole-src/`
 是本地参考检出目录。当前支持：
 
-![s0xDk/ghostty-blackhole demo](docs/demo.gif)
-
-动图文件已归档到本仓库 `docs/demo.gif`，原始来源：
-[s0xDk/ghostty-blackhole](https://github.com/s0xDk/ghostty-blackhole)。
-
 - `bh demo`：打开独立动态黑洞演示。
 - `bh token`：打开手动 token 测试模式。
 - `bh codex` 或 `bh`：在 Blackhole 终端中启动 WSL Codex，并按真实上下文比例驱动黑洞。
 - `bh claude`：在 Blackhole 终端中启动 Windows Claude Code，并接入 token/statusLine 模式。
+
+![Blackhole demo](docs/demo.gif)
 
 ## 快速使用
 
