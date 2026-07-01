@@ -16,7 +16,7 @@ case "$mode" in
     shift || true
     exec node "$script_dir/bh-mode.js" open-codex "$@"
     ;;
-  demo|token|tokens|pomodoro|mode|status|current)
+  demo|token|tokens|pomodoro|clock|timer|mode|status|current)
     exec node "$script_dir/bh-mode.js" "$mode" --open
     ;;
   codex)
@@ -36,6 +36,7 @@ Usage:
   bh demo       Install demo shader and open a new Blackhole tab.
   bh token      Install token shader and open a new Blackhole tab.
   bh pomodoro   Install pomodoro shader and open a new Blackhole tab.
+  bh clock      Alias of bh pomodoro.
   bh mode       Print the installed shader path and last requested mode.
   bh            Open a new Blackhole tab running WSL Codex.
   bh claude     Open a new Blackhole tab running Windows Claude Code.

@@ -7,6 +7,8 @@
 - 完成 Ghostty 黑洞 shader 到 Windows Terminal HLSL 的移植。
 - `bh demo` 可打开动态演示黑洞。
 - `bh token` 可手动测试固定上下文等级。
+- `bh pomodoro` / `bh clock` 可打开按本地墙钟运行的 55/5 番茄钟模式；Windows
+  Terminal 侧没有 Ghostty 的 cursor idle uniform，因此不做终端空闲淡出。
 - `bh codex` 可在 Windows Terminal 中启动 WSL Codex，并按上下文比例驱动黑洞。
 - `bh claude` 可在 Windows Terminal 中启动 Windows Claude Code，并按上下文比例驱动黑洞。
 - Codex 新会话初始等级回到最小比例，不继承旧同目录会话。
@@ -52,7 +54,7 @@ node blackhole-windows-terminal/verify-blackhole-port.js
 `verify-blackhole-port.js` 的通过输出应包含：
 
 ```text
-OK: 42 model constants, 3 local tuning constants, 43 formula anchors, and 3 host-adaptation anchors verified.
+OK: 42 model constants, 3 local tuning constants, 55 formula anchors, and 7 host-adaptation anchors verified.
 ```
 
 ## 注意事项
@@ -60,6 +62,6 @@ OK: 42 model constants, 3 local tuning constants, 43 formula anchors, and 3 host
 - 旧的 `codex-blackhole-launch.sh`、`codex-blackhole-hook.sh`、
   `codex-blackhole-wsl.cmd` 已改成自定位，但主入口仍建议使用 `bh` / `bh.cmd`。
 - `ghostty-blackhole-src/` 是上游参考源码，源码树 Git 忽略；复现归档包会包含它，便于离线校验。
-- 不要直接手改 Windows Terminal `settings.json` 中的 live shader 路径；运行 `bh token`
-  或 `bh mode` 让脚本维护。
+- 不要直接手改 Windows Terminal `settings.json` 中的 live shader 路径；运行
+  `bh token`、`bh pomodoro` 或 `bh mode` 让脚本维护。
 - 视觉效果最终以真实 Windows Terminal 窗口确认。

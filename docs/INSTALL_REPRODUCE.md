@@ -6,6 +6,7 @@
 ## 目标效果
 
 - `bh demo`：打开 Windows Terminal `Blackhole` 标签页，显示动态黑洞演示。
+- `bh pomodoro` / `bh clock`：打开按本地墙钟运行的 55/5 番茄钟模式。
 - `bh codex`：在 `Blackhole` 标签页启动 WSL Codex，黑洞按 Codex 上下文比例线性变化。
 - Codex `resume` 会跟随实际打开的 rollout；`new` 会回到最小比例。
 - `bh claude`：在 `Blackhole` 标签页启动 Windows Claude Code，黑洞按 Claude Code 上下文比例变化。
@@ -138,6 +139,8 @@ Windows `cmd` 或 WSL 中都可以运行：
 ```cmd
 bh demo
 bh token
+bh pomodoro
+bh clock
 bh codex
 bh claude
 bh mode
@@ -161,6 +164,8 @@ node blackhole-windows-terminal\blackhole-statusline.js level-test 0.5
 - `BLACKHOLE_WT_SETTINGS`：Windows Terminal `settings.json` 路径。
 - `BLACKHOLE_CLAUDE_DIR`：Claude 配置目录。
 - `BLACKHOLE_CLAUDE_SETTINGS`：Claude `settings.json` 路径。
+- `BLACKHOLE_POMODORO_TIME_SCALE`：番茄钟测试加速；默认 `1`，例如 `100` 可快速验证。
+- `BLACKHOLE_POMODORO_WALL_OFFSET_SEC`：手动指定番茄钟当天秒数，通常不需要设置。
 - `CODEX_BLACKHOLE_CODEX_BIN`：强制指定 Codex 可执行文件。
 - `CODEX_BLACKHOLE_MIN_LEVEL`：Codex 初始显示地板，默认 `0`。
 - `CODEX_BLACKHOLE_TOKEN_MAX`：Codex token 上限估算，默认 `25000000`。

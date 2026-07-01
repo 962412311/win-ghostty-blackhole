@@ -11,6 +11,8 @@ const modes = new Map([
   ['token', 'MODE_TOKENS'],
   ['tokens', 'MODE_TOKENS'],
   ['pomodoro', 'MODE_POMODORO'],
+  ['clock', 'MODE_POMODORO'],
+  ['timer', 'MODE_POMODORO'],
 ]);
 
 const toolDir = __dirname;
@@ -80,7 +82,9 @@ function usage(exitCode) {
 }
 
 function canonicalMode(mode) {
-  return mode === 'tokens' ? 'token' : mode;
+  if (mode === 'tokens') return 'token';
+  if (mode === 'clock' || mode === 'timer') return 'pomodoro';
+  return mode;
 }
 
 function currentMode(text) {
@@ -121,13 +125,42 @@ function quoteCmd(value) {
   return `"${String(value).replace(/"/g, '\\"')}"`;
 }
 
-function renderShader(define) {
+function shaderFloat(value) {
+  return Number(value).toFixed(4);
+}
+
+function envNumber(name, fallback) {
+  const raw = process.env[name];
+  if (raw === undefined || raw === '') return fallback;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function localSecondsOfDay(date = new Date()) {
+  return date.getHours() * 3600
+    + date.getMinutes() * 60
+    + date.getSeconds()
+    + date.getMilliseconds() / 1000;
+}
+
+function renderShader(define, mode) {
   const source = fs.readFileSync(sourceShader, 'utf8');
-  const next = source.replace(/#define\s+SIZE_MODE\s+MODE_[A-Z]+/, `#define SIZE_MODE ${define}`);
+  let next = source.replace(/#define\s+SIZE_MODE\s+MODE_[A-Z]+/, `#define SIZE_MODE ${define}`);
   if (next === source && !source.includes(`#define SIZE_MODE ${define}`)) {
     console.error('Could not find SIZE_MODE define in shader source.');
     process.exit(1);
   }
+
+  if (canonicalMode(mode) === 'pomodoro') {
+    const offset = envNumber('BLACKHOLE_POMODORO_WALL_OFFSET_SEC', localSecondsOfDay());
+    const scale = envNumber('BLACKHOLE_POMODORO_TIME_SCALE', 1);
+    next = next
+      .replace(/static const float TIME_SCALE\s+=\s+[-+]?\d+(?:\.\d+)?;/,
+        `static const float TIME_SCALE       = ${shaderFloat(scale)};`)
+      .replace(/static const float POMODORO_WALL_OFFSET\s+=\s+[-+]?\d+(?:\.\d+)?;/,
+        `static const float POMODORO_WALL_OFFSET = ${shaderFloat(offset)};`);
+  }
+
   return next;
 }
 
@@ -246,7 +279,7 @@ function installMode(mode, ownerLabel = mode) {
   const ownerId = claimLiveOwner(ownerLabel);
   const define = modes.get(mode);
   fs.mkdirSync(path.dirname(runtimeShader), { recursive: true });
-  fs.writeFileSync(runtimeShader, renderShader(define));
+  fs.writeFileSync(runtimeShader, renderShader(define, mode));
   updateWtProfile(runtimeShader);
   saveState(canonicalMode(mode));
   return ownerId;

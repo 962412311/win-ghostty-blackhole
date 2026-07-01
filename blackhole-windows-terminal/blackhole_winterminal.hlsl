@@ -73,6 +73,7 @@ static const float WORK_PERIOD_MIN  = 55.0000;
 static const float BREAK_MIN        = 5.0000;
 static const float IDLE_FADE_SEC    = 90.0000;
 static const float TIME_SCALE       = 1.0000;
+static const float POMODORO_WALL_OFFSET = 0.0000;
 static const float2 TOKEN_DATA_UV_TOP = float2(0.0060, 0.0180);
 static const float2 TOKEN_DATA_UV_BOTTOM = float2(0.0060, 0.9970);
 static const float TOKEN_DATA_X_STEP = 0.0040;
@@ -346,7 +347,7 @@ float4 main(float4 pos : SV_POSITION, float2 tex : TEXCOORD) : SV_TARGET
     {
         float workSec = WORK_PERIOD_MIN * 60.0;
         float cycleSec = workSec + BREAK_MIN * 60.0;
-        float wall = Time * TIME_SCALE;
+        float wall = POMODORO_WALL_OFFSET + Time * TIME_SCALE;
         float phase = fmod(wall, cycleSec);
         float collapse = min(60.0, workSec * 0.15);
         float grow = clamp(phase / workSec, 0.0, 1.0)

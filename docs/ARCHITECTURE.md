@@ -22,10 +22,18 @@
 
 - `MODE_DEMO`：独立演示，按时间自动变化。
 - `MODE_TOKENS`：由上下文比例驱动。
-- `MODE_POMODORO`：番茄钟模式。
+- `MODE_POMODORO`：番茄钟/时钟模式。
 
-`bh demo`、`bh token`、`bh pomodoro` 会重写运行时 shader 的 `SIZE_MODE`，并更新
-Windows Terminal profile。
+`bh demo`、`bh token`、`bh pomodoro`/`bh clock` 会重写运行时 shader 的
+`SIZE_MODE`，并更新 Windows Terminal profile。
+
+`MODE_POMODORO` 的 55/5 周期、增长、收缩和漂移公式保持 Ghostty 原版。Ghostty
+使用 `iDate.w` 读取墙钟；Windows Terminal shader 只暴露启用后的 `Time`，所以
+`bh pomodoro` 安装 runtime shader 时会把当前本地当天秒数写入
+`POMODORO_WALL_OFFSET`，HLSL 用 `POMODORO_WALL_OFFSET + Time * TIME_SCALE`
+复刻原版的墙钟进度。Windows Terminal 没有 Ghostty 的 `iTimeCursorChange`
+uniform，无法在 shader 内判断终端输入空闲，因此 idle fade 固定为未空闲。测试时可
+临时设置 `BLACKHOLE_POMODORO_TIME_SCALE=100` 快速观察一轮变化。
 
 ## Token 数据通道
 

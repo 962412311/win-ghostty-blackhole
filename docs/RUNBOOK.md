@@ -85,6 +85,30 @@ WSL：
 - 运行 `bh mode`，确认输出路径是 Windows 侧 `terminal-shaders`。
 - 重新打开一个 `Blackhole` 标签页。
 
+### 快速验证番茄钟模式
+
+正常模式按本地墙钟执行 55/5 周期：
+
+```bash
+bh pomodoro
+```
+
+如果不想等待完整周期，可临时加速 runtime shader：
+
+```bash
+BLACKHOLE_POMODORO_TIME_SCALE=100 bh pomodoro
+```
+
+Windows `cmd`：
+
+```cmd
+set BLACKHOLE_POMODORO_TIME_SCALE=100
+bh pomodoro
+set BLACKHOLE_POMODORO_TIME_SCALE=
+```
+
+确认后重新运行 `bh pomodoro` 恢复真实速度。
+
 ### `bh codex` 模型和手动 Codex 不一致
 
 `codex-blackhole-supervisor.js` 会优先使用 WSL `PATH` 上的 `codex`。如果仍不一致：

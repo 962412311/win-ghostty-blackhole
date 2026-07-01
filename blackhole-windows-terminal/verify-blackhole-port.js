@@ -32,6 +32,7 @@ const HLSL_ONLY_CONSTANTS = new Set([
   'TOKEN_DATA_UV_BOTTOM',
   'TOKEN_DATA_X_STEP',
   'TOKEN_DATA_Y_STEP',
+  'POMODORO_WALL_OFFSET',
 ]);
 
 const FORMULA_ANCHORS = [
@@ -39,6 +40,18 @@ const FORMULA_ANCHORS = [
   ['demo look gate', 'if (SIZE_MODE == MODE_DEMO) L = demoLook();', 'if (SIZE_MODE == MODE_DEMO) L = demoLook();'],
   ['disk inner clamp', 'max(L.inner, 1.6)', 'max(L.inner, 1.6)'],
   ['disk outer clamp', 'max(L.outer, rin + 0.5)', 'max(L.outer, rin + 0.5)'],
+  ['pomodoro work seconds', 'WORK_PERIOD_MIN * 60.0', 'WORK_PERIOD_MIN * 60.0'],
+  ['pomodoro cycle seconds', 'workSec + BREAK_MIN * 60.0', 'workSec + BREAK_MIN * 60.0'],
+  ['pomodoro phase', 'mod(wall, cycleSec)', 'fmod(wall, cycleSec)'],
+  ['pomodoro collapse', 'min(60.0, workSec * 0.15)', 'min(60.0, workSec * 0.15)'],
+  ['pomodoro growth clamp', 'clamp(phase / workSec, 0.0, 1.0)', 'clamp(phase / workSec, 0.0, 1.0)'],
+  ['pomodoro collapse fade', '1.0 - smoothstep(workSec - collapse, workSec, phase)', '1.0 - smoothstep(workSec - collapse, workSec, phase)'],
+  ['pomodoro intensity', 'I = mix(0.12, 1.0, grow)', 'I = lerp(0.12, 1.0, grow)'],
+  ['pomodoro idle fade', '1.0 - smoothstep(IDLE_FADE_SEC, max(BREAK_MIN * 60.0, IDLE_FADE_SEC + 1.0), idle)', '1.0 - smoothstep(IDLE_FADE_SEC, max(BREAK_MIN * 60.0, IDLE_FADE_SEC + 1.0), idle)'],
+  ['pomodoro size', 'sz = mix(0.22, 1.0, I)', 'sz = lerp(0.22, 1.0, I)'],
+  ['pomodoro extent', '(rout / B_CRIT) * HOLE_RADIUS * sz', '(rout / B_CRIT) * HOLE_RADIUS * sz'],
+  ['pomodoro y low', 'WORK_AREA + 0.12 + ext', 'WORK_AREA + 0.12 + ext'],
+  ['pomodoro speed', 'mix(0.35, 1.0, I)', 'lerp(0.35, 1.0, I)'],
   ['token level demo', 'min(mod(iTime, DEMO_SEC) / DEMO_GROW_SEC, 1.0)', 'min(fmod(Time, DEMO_SEC) / DEMO_GROW_SEC, 1.0)'],
   ['token ease', 'pow(clamp(lvl, 0.0, 1.0), TOKEN_EASE)', 'pow(clamp(lvl, 0.0, 1.0), TOKEN_EASE)'],
   ['token intensity', 'mix(0.10, 1.0, g)', 'lerp(0.10, 1.0, g)'],
@@ -84,6 +97,10 @@ const HOST_ADAPTATION_ANCHORS = [
   ['ghostty screen uv source', 'fragCoord / res', null],
   ['windows terminal screen uv source', null, 'float2 uv = pos.xy / res;'],
   ['windows terminal passthrough sampling', null, 'shaderTexture.Sample(samplerState, tex)'],
+  ['ghostty pomodoro wall clock', 'float wall     = iDate.w + iTime * (TIME_SCALE - 1.0);', null],
+  ['windows terminal pomodoro wall offset', null, 'float wall = POMODORO_WALL_OFFSET + Time * TIME_SCALE;'],
+  ['ghostty pomodoro cursor idle', 'float idle = max(0.0, iTime - iTimeCursorChange);', null],
+  ['windows terminal no cursor idle uniform', null, 'float idle = 0.0;'],
 ];
 
 function read(file) {

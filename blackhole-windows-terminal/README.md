@@ -24,6 +24,7 @@ Windows `cmd`：
 bh demo
 bh token
 bh pomodoro
+bh clock
 bh
 bh codex
 bh claude
@@ -35,6 +36,8 @@ WSL：
 ```bash
 bh demo
 bh token
+bh pomodoro
+bh clock
 bh codex
 bh claude
 bh mode
@@ -44,7 +47,8 @@ bh mode
 
 - `bh demo`：安装 demo shader，并打开 `Blackhole demo` 标签页。
 - `bh token`：安装 token shader，并打开 `Blackhole token` 标签页。
-- `bh pomodoro`：安装 pomodoro shader，并打开 `Blackhole pomodoro` 标签页。
+- `bh pomodoro` / `bh clock`：安装 pomodoro shader，并打开 `Blackhole pomodoro`
+  标签页。
 - `bh` / `bh codex`：安装 token shader，并在 `Blackhole` 标签页中启动
   WSL Codex。
 - `bh claude`：安装 token shader，安装 Claude Code bridge，并在 `Blackhole`
@@ -62,6 +66,10 @@ settings 中的命令会先尝试 `/mnt/c/.../claude-blackhole-statusline.sh`，
 `/c/.../claude-blackhole-statusline.sh`，兼容 WSL bash 和 Windows Git/MSYS bash。
 helper 借鉴原始 Ghostty 仓库的接入方式：默认不显示调试文本，真实等级写入
 运行时 shader 的 `TOKEN_LEVEL` fallback，近黑色状态栏色块只作为兼容通道。
+
+`bh pomodoro` 是按本地墙钟运行的 55/5 番茄钟模式；`bh clock` 是同一模式的别名。
+Windows Terminal 没有 Ghostty 的 cursor idle uniform，因此该模式不做终端空闲淡出。
+需要快速验证时可临时运行 `BLACKHOLE_POMODORO_TIME_SCALE=100 bh pomodoro`。
 
 ## Windows Terminal 配置
 

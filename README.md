@@ -7,6 +7,7 @@ Windows Terminal 黑洞像素着色器项目。核心 shader 基于原仓库
 
 - `bh demo`：打开独立动态黑洞演示。
 - `bh token`：打开手动 token 测试模式。
+- `bh pomodoro` 或 `bh clock`：打开按本地墙钟运行的 55/5 番茄钟模式。
 - `bh codex` 或 `bh`：在 Blackhole 终端中启动 WSL Codex，并按真实上下文比例驱动黑洞。
 - `bh claude`：在 Blackhole 终端中启动 Windows Claude Code，并接入 token/statusLine 模式。
 
@@ -25,13 +26,16 @@ bh demo
 :: 打开手动 token 测试模式
 bh token
 
+:: 打开按本地墙钟运行的 55/5 番茄钟模式
+bh pomodoro
+
 :: 启动 WSL Codex，并按真实上下文比例驱动黑洞
 bh codex
 
 :: 启动 Windows Claude Code，并接入 token/statusLine 模式
 bh claude
 
-:: 安装或切换 Blackhole shader 模式
+:: 查看当前 Blackhole shader 模式
 bh mode
 ```
 
@@ -61,7 +65,8 @@ node blackhole-windows-terminal\blackhole-statusline.js level-test 0.5
 - `TOKEN_EASE`：上下文等级到尺寸的曲线，`1.0` 为线性。
 - `TOKEN_CALM` / `TOKEN_RUSH`：低/高上下文等级下的移动速度。
 
-改完后重新运行 `bh token`、`bh codex` 或 `bh claude` 让运行时 shader 生效。
+改完后重新运行 `bh token`、`bh pomodoro`、`bh codex` 或 `bh claude` 让运行时
+shader 生效。
 
 ## 验证
 

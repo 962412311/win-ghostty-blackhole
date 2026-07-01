@@ -18,6 +18,10 @@ if "%MODE%"=="" (
   goto run_mode
 ) else if /I "%MODE%"=="pomodoro" (
   goto run_mode
+) else if /I "%MODE%"=="clock" (
+  goto run_mode
+) else if /I "%MODE%"=="timer" (
+  goto run_mode
 ) else if /I "%MODE%"=="mode" (
   goto run_mode
 ) else if /I "%MODE%"=="status" (
@@ -107,6 +111,7 @@ echo Usage:
 echo   bh demo        Install demo shader and open a new Blackhole tab.
 echo   bh token       Install token shader and open a new Blackhole tab.
 echo   bh pomodoro    Install pomodoro shader and open a new Blackhole tab.
+echo   bh clock       Alias of bh pomodoro.
 echo   bh mode        Print the installed shader path and last requested mode.
 echo   bh             Open a new Blackhole tab running WSL Codex.
 echo   bh claude      Open a new Blackhole tab running Windows Claude Code.
@@ -114,5 +119,5 @@ echo   bh codex       Open a new Blackhole tab running WSL Codex.
 exit /b 0
 
 :usage_error
-echo Usage: bh [demo^|token^|pomodoro^|mode^|claude^|codex]
+echo Usage: bh [demo^|token^|pomodoro^|clock^|mode^|claude^|codex]
 exit /b 2

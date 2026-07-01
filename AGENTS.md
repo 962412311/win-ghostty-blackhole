@@ -21,6 +21,8 @@
   检查，否则旧 Codex/Claude 写入者会互相覆盖导致闪烁。
 - Windows 本地视觉调优只允许集中在 `TOKEN_AREA_MIN`、`TOKEN_CALM`、`TOKEN_RUSH`
   等明确列入 verifier 的 local tuning 常量中。
+- `MODE_POMODORO` 在 Windows Terminal 中用 `POMODORO_WALL_OFFSET` 补偿缺失的
+  `iDate.w`；Windows Terminal 没有 Ghostty 的 `iTimeCursorChange`，空闲检测固定为未空闲。
 - Windows Terminal 真实视觉验证以用户肉眼确认为准；不要默认依赖截图自动判断。
 - 所有面向用户的文档保持中文。
 
