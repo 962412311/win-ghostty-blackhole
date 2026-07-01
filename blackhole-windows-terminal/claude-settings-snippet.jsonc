@@ -1,5 +1,30 @@
-// 已废弃。
-// 不要在 Windows 原生 cmd 的 Claude Code 中为此 shader 启用 statusLine。
-// Claude Code 2.1.196 会把 statusLine JSON 泄漏到 cmd 提示符中，
-// 不能稳定通过配置命令消费 stdin。
-{}
+// 可手动合并到 C:\Users\YOUR_USER\.claude\settings.json。
+// 正常使用时不需要手动复制；运行 `bh claude` 会自动安装这段配置。
+{
+  "statusLine": {
+    "type": "command",
+    "command": "p='/mnt/c/Users/YOUR_USER/.claude/claude-blackhole-statusline.sh'; [ -f \"$p\" ] || p='/c/Users/YOUR_USER/.claude/claude-blackhole-statusline.sh'; [ -f \"$p\" ] && bash \"$p\" || true"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p='/mnt/c/Users/YOUR_USER/.claude/claude-blackhole-statusline.sh'; [ -f \"$p\" ] || p='/c/Users/YOUR_USER/.claude/claude-blackhole-statusline.sh'; [ -f \"$p\" ] && bash \"$p\" || true"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "p='/mnt/c/Users/YOUR_USER/.claude/claude-blackhole-statusline.sh'; [ -f \"$p\" ] || p='/c/Users/YOUR_USER/.claude/claude-blackhole-statusline.sh'; [ -f \"$p\" ] && bash \"$p\" || true"
+          }
+        ]
+      }
+    ]
+  }
+}

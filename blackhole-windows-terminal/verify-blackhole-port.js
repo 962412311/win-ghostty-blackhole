@@ -11,13 +11,19 @@ const MODEL_CONSTANTS = [
   'DISK_GAIN', 'DISK_OPACITY', 'DISK_TEMP', 'DOPPLER_MIX',
   'DISK_BEAM', 'DISK_SPEED', 'DISK_WIND', 'DISK_CONTRAST',
   'EXPOSURE', 'DRIFT_SPEED', 'WORK_AREA', 'DILATION_MIN',
-  'TOKEN_AREA_MIN', 'TOKEN_AREA_MAX', 'TOKEN_HOME_X', 'TOKEN_HOME_Y',
-  'TOKEN_EASE', 'TOKEN_REACH', 'TOKEN_CALM', 'TOKEN_RUSH',
+  'TOKEN_AREA_MAX', 'TOKEN_HOME_X', 'TOKEN_HOME_Y',
+  'TOKEN_EASE', 'TOKEN_REACH',
   'N_STEPS', 'MODE_POMODORO', 'MODE_TOKENS', 'MODE_DEMO', 'SIZE_MODE',
   'TOKEN_LEVEL', 'TOKEN_GLIDE_MIN', 'TOKEN_GLIDE_MAX', 'TOKEN_GLIDE_RATE',
   'DEMO_SEC', 'DEMO_GROW_SEC', 'DEMO_XFADE', 'DEMO_N',
   'WORK_PERIOD_MIN', 'BREAK_MIN', 'IDLE_FADE_SEC', 'TIME_SCALE', 'B_CRIT',
 ];
+
+const LOCAL_TUNING_CONSTANTS = new Map([
+  ['TOKEN_AREA_MIN', '0.0030'],
+  ['TOKEN_CALM', '0.0200'],
+  ['TOKEN_RUSH', '0.5500'],
+]);
 
 const HLSL_ONLY_CONSTANTS = new Set([
   'DEBUG_PASSTHROUGH',
@@ -114,9 +120,14 @@ for (const name of MODEL_CONSTANTS) {
 }
 
 for (const name of hlslConstants.keys()) {
-  if (!glslConstants.has(name) && !HLSL_ONLY_CONSTANTS.has(name)) {
+  if (!glslConstants.has(name) && !HLSL_ONLY_CONSTANTS.has(name) && !LOCAL_TUNING_CONSTANTS.has(name)) {
     fail(`unexpected HLSL constant: ${name}`);
   }
+}
+
+for (const [name, expected] of LOCAL_TUNING_CONSTANTS) {
+  const actual = hlslConstants.get(name);
+  if (actual !== expected) fail(`local tuning mismatch ${name}: expected=${expected} HLSL=${actual}`);
 }
 
 for (const [label, glslNeedle, hlslNeedle] of FORMULA_ANCHORS) {
@@ -130,5 +141,5 @@ for (const [label, glslNeedle, hlslNeedle] of HOST_ADAPTATION_ANCHORS) {
 }
 
 if (!process.exitCode) {
-  console.log(`OK: ${MODEL_CONSTANTS.length} model constants, ${FORMULA_ANCHORS.length} formula anchors, and ${HOST_ADAPTATION_ANCHORS.length} host-adaptation anchors verified.`);
+  console.log(`OK: ${MODEL_CONSTANTS.length} model constants, ${LOCAL_TUNING_CONSTANTS.size} local tuning constants, ${FORMULA_ANCHORS.length} formula anchors, and ${HOST_ADAPTATION_ANCHORS.length} host-adaptation anchors verified.`);
 }

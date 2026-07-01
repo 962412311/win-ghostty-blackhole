@@ -62,12 +62,11 @@ node "%TOOL_DIR%bh-mode.js" %MODE% --open
 exit /b %ERRORLEVEL%
 
 :run_claude
-echo Claude Code blackhole mode is disabled on Windows because Claude leaks statusLine JSON into cmd.
-echo Use bh codex for the blackhole effect, or run claude normally without bh.
-exit /b 2
+node "%TOOL_DIR%bh-mode.js" open-claude %BH_ARGS%
+exit /b %ERRORLEVEL%
 
 :run_claude_inplace
-node "%TOOL_DIR%bh-mode.js" token >nul
+node "%TOOL_DIR%bh-mode.js" install-claude >nul
 where claude >nul 2>nul
 if errorlevel 1 (
   echo claude was not found on PATH.
@@ -88,7 +87,19 @@ if not defined WSL_CWD (
   echo Could not map current Windows directory to WSL: %CD%
   exit /b 1
 )
-C:\Windows\System32\wsl.exe -d Ubuntu --cd "%WSL_CWD%" --exec /mnt/i/QtWorkData/MyTools/my_ghostty_blackhole/blackhole-windows-terminal/bh __run_codex %BH_ARGS%
+set "WSL_BH="
+for /f "usebackq delims=" %%I in (`C:\Windows\System32\wsl.exe -d Ubuntu --exec wslpath -a "%TOOL_DIR%bh" 2^>nul`) do set "WSL_BH=%%I"
+if not defined WSL_BH (
+  echo Could not map bh script to WSL: %TOOL_DIR%bh
+  exit /b 1
+)
+set "BH_WSLENV=CODEX_BLACKHOLE_MIN_LEVEL/u:CODEX_BLACKHOLE_TOKEN_MAX/u:CODEX_BLACKHOLE_INTERVAL_MS/u:BLACKHOLE_DEBUG_STDOUT/u"
+if defined WSLENV (
+  set "WSLENV=!WSLENV!:!BH_WSLENV!"
+) else (
+  set "WSLENV=!BH_WSLENV!"
+)
+C:\Windows\System32\wsl.exe -d Ubuntu --cd "%WSL_CWD%" --exec "%WSL_BH%" __run_codex %BH_ARGS%
 exit /b %ERRORLEVEL%
 
 :usage
@@ -98,7 +109,7 @@ echo   bh token       Install token shader and open a new Blackhole tab.
 echo   bh pomodoro    Install pomodoro shader and open a new Blackhole tab.
 echo   bh mode        Print the installed shader path and last requested mode.
 echo   bh             Open a new Blackhole tab running WSL Codex.
-echo   bh claude      Disabled: run claude normally, without blackhole.
+echo   bh claude      Open a new Blackhole tab running Windows Claude Code.
 echo   bh codex       Open a new Blackhole tab running WSL Codex.
 exit /b 0
 

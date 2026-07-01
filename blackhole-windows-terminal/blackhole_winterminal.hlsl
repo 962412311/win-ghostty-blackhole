@@ -52,14 +52,14 @@ static const float EXPOSURE      = 1.4000;
 static const float DRIFT_SPEED   = 1.0000;
 static const float WORK_AREA     = 0.3300;
 static const float DILATION_MIN  = 0.2000;
-static const float TOKEN_AREA_MIN = 0.0100;
+static const float TOKEN_AREA_MIN = 0.0030;
 static const float TOKEN_AREA_MAX = 0.5000;
 static const float TOKEN_HOME_X  = 0.9600;
 static const float TOKEN_HOME_Y  = 0.0400;
 static const float TOKEN_EASE    = 1.0000;
 static const float TOKEN_REACH   = 1.0000;
-static const float TOKEN_CALM    = 0.0400;
-static const float TOKEN_RUSH    = 1.1000;
+static const float TOKEN_CALM    = 0.0200;
+static const float TOKEN_RUSH    = 0.5500;
 
 static const float DEMO_SEC      = 42.0000;
 static const float DEMO_GROW_SEC = 40.0000;
@@ -74,7 +74,7 @@ static const float BREAK_MIN        = 5.0000;
 static const float IDLE_FADE_SEC    = 90.0000;
 static const float TIME_SCALE       = 1.0000;
 static const float2 TOKEN_DATA_UV_TOP = float2(0.0060, 0.0180);
-static const float2 TOKEN_DATA_UV_BOTTOM = float2(0.0060, 0.9850);
+static const float2 TOKEN_DATA_UV_BOTTOM = float2(0.0060, 0.9970);
 static const float TOKEN_DATA_X_STEP = 0.0040;
 static const float TOKEN_DATA_Y_STEP = 0.0120;
 
@@ -272,16 +272,30 @@ float tokenDecode(float3 c)
 float screenTokenAt(float2 base, float yDir, float2 pixelUv, float2 pixelTex,
                     float2 texPerUvX, float2 texPerUvY)
 {
-    float2 probes[5] = {
+    float yHalf = TOKEN_DATA_Y_STEP * 0.5 * yDir;
+    float yFull = TOKEN_DATA_Y_STEP * yDir;
+    float x1 = TOKEN_DATA_X_STEP * 1.5;
+    float x2 = TOKEN_DATA_X_STEP * 3.0;
+    float2 probes[15] = {
         base,
-        base + float2(TOKEN_DATA_X_STEP * 1.5, 0.0),
-        base + float2(TOKEN_DATA_X_STEP * 3.0, 0.0),
-        base + float2(TOKEN_DATA_X_STEP * 1.5, TOKEN_DATA_Y_STEP * yDir),
-        base + float2(TOKEN_DATA_X_STEP * 3.0, TOKEN_DATA_Y_STEP * yDir)
+        base + float2(x1, 0.0),
+        base + float2(x2, 0.0),
+        base + float2(0.0, yHalf),
+        base + float2(x1, yHalf),
+        base + float2(x2, yHalf),
+        base + float2(0.0, yFull),
+        base + float2(x1, yFull),
+        base + float2(x2, yFull),
+        base + float2(0.0, yFull * 2.0),
+        base + float2(x1, yFull * 2.0),
+        base + float2(x2, yFull * 2.0),
+        base + float2(0.0, yFull * 4.0),
+        base + float2(x1, yFull * 4.0),
+        base + float2(x2, yFull * 4.0)
     };
 
     [unroll]
-    for (int i = 0; i < 5; i++)
+    for (int i = 0; i < 15; i++)
     {
         float lvl = tokenDecode(shaderTexture.Sample(samplerState,
             screenToTex(saturate(probes[i]), pixelUv, pixelTex, texPerUvX, texPerUvY)).rgb);
@@ -356,11 +370,11 @@ float4 main(float4 pos : SV_POSITION, float2 tex : TEXCOORD) : SV_TARGET
     else
     {
         float live = -1.0;
-        if (SIZE_MODE != MODE_DEMO)
+        if (SIZE_MODE != MODE_DEMO && TOKEN_LEVEL < 0.0)
             live = tokenLevel(uv, tex, texPerUvX, texPerUvY);
         float lvl = (SIZE_MODE == MODE_DEMO)
                   ? min(fmod(Time, DEMO_SEC) / DEMO_GROW_SEC, 1.0)
-                  : (live >= 0.0 ? live : TOKEN_LEVEL);
+                  : (TOKEN_LEVEL >= 0.0 ? TOKEN_LEVEL : live);
         if (lvl < 0.0)
             return float4(shaderTexture.Sample(samplerState, tex).rgb, 1.0);
 

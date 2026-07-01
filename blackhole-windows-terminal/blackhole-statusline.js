@@ -8,6 +8,9 @@ const path = require('path');
 const ESC = '\x1b';
 const DEFAULT_CODEX_STATE = path.join(os.homedir(), '.codex', 'state_5.sqlite');
 const DEFAULT_CODEX_TOKEN_MAX = 25000000;
+const DEFAULT_CLAUDE_TOKEN_MAX = 200000;
+const DEFAULT_WINDOWS_USER = 'YOUR_USER';
+const WT_PROFILE_NAME = process.env.BLACKHOLE_WT_PROFILE || 'Blackhole';
 
 function clamp(value, lo, hi) {
   return Math.min(hi, Math.max(lo, value));
@@ -35,6 +38,14 @@ function levelFromUsage(used, limit) {
   return clamp(u / l, 0.0, 1.0);
 }
 
+function levelFromUsageParts(parts, limit) {
+  const total = parts.reduce((sum, value) => {
+    const n = asNumber(value);
+    return n === null ? sum : sum + n;
+  }, 0);
+  return levelFromUsage(total, limit);
+}
+
 function safeJson(text) {
   if (!text || !text.trim()) return null;
   try {
@@ -56,6 +67,157 @@ function readStdinIfPiped() {
 function basenameAny(input) {
   if (!input) return '';
   return String(input).replace(/[\\/]+$/, '').split(/[\\/]/).pop() || '';
+}
+
+function normalizeLocalPath(filePath) {
+  if (!filePath) return '';
+  const text = String(filePath);
+  if (fs.existsSync(text)) return text;
+  if (process.platform !== 'win32') {
+    const match = text.match(/^([a-zA-Z]):[\\/](.*)$/);
+    if (match) return `/mnt/${match[1].toLowerCase()}/${match[2].replace(/\\/g, '/')}`;
+  }
+  return text;
+}
+
+function windowsUser() {
+  if (process.env.BLACKHOLE_WINDOWS_USER) return process.env.BLACKHOLE_WINDOWS_USER;
+  if (process.platform === 'win32') {
+    const userProfile = process.env.USERPROFILE || `C:\\Users\\${DEFAULT_WINDOWS_USER}`;
+    return path.basename(userProfile);
+  }
+  try {
+    const user = childProcess.execFileSync(
+      'cmd.exe',
+      ['/d', '/c', 'echo %USERNAME%'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 1000 },
+    ).trim();
+    if (user) return user;
+  } catch {}
+  return DEFAULT_WINDOWS_USER;
+}
+
+function defaultRuntimeShader() {
+  if (process.platform === 'win32') {
+    const userProfile = process.env.USERPROFILE || `C:\\Users\\${DEFAULT_WINDOWS_USER}`;
+    return path.join(userProfile, 'terminal-shaders', 'blackhole_winterminal.hlsl');
+  }
+  return `/mnt/c/Users/${windowsUser()}/terminal-shaders/blackhole_winterminal.hlsl`;
+}
+
+function defaultWtSettingsPath() {
+  if (process.platform === 'win32') {
+    const localAppData = process.env.LOCALAPPDATA
+      || path.join(process.env.USERPROFILE || `C:\\Users\\${DEFAULT_WINDOWS_USER}`, 'AppData', 'Local');
+    return path.join(
+      localAppData,
+      'Packages',
+      'Microsoft.WindowsTerminal_8wekyb3d8bbwe',
+      'LocalState',
+      'settings.json',
+    );
+  }
+  return `/mnt/c/Users/${windowsUser()}/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json`;
+}
+
+function toWindowsPath(filePath) {
+  if (process.platform === 'win32') return filePath;
+  const match = String(filePath).match(/^\/mnt\/([a-zA-Z])\/(.*)$/);
+  if (!match) return filePath;
+  return `${match[1].toUpperCase()}:\\${match[2].replace(/\//g, '\\')}`;
+}
+
+function loadWtSettings() {
+  const settingsPath = process.env.BLACKHOLE_WT_SETTINGS || defaultWtSettingsPath();
+  if (!fs.existsSync(settingsPath)) return null;
+  try {
+    return {
+      path: settingsPath,
+      settings: JSON.parse(fs.readFileSync(settingsPath, 'utf8')),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function findBlackholeProfile(settings) {
+  const list = settings?.profiles?.list;
+  if (!Array.isArray(list)) return null;
+  return list.find((profile) => profile.name === WT_PROFILE_NAME) || null;
+}
+
+function canonicalShaderPath(filePath) {
+  return String(filePath).replace(/_live[01](\.hlsl)$/i, '$1');
+}
+
+function liveShaderPath(basePath, slot) {
+  return String(basePath).replace(/(\.hlsl)$/i, `_live${slot}$1`);
+}
+
+function shaderLevelText(level) {
+  if (level < 0.0) return '-1';
+  return (Math.round(clamp(level, 0.0, 1.0) * 100.0) / 100.0).toFixed(4);
+}
+
+function updateShaderLevel(level) {
+  if (process.env.BLACKHOLE_DISABLE_SHADER_LEVEL === '1') return false;
+
+  const baseShader = normalizeLocalPath(process.env.BLACKHOLE_SHADER_PATH || defaultRuntimeShader());
+  const wt = loadWtSettings();
+  const profile = wt ? findBlackholeProfile(wt.settings) : null;
+  const profileShader = normalizeLocalPath(profile?.['experimental.pixelShaderPath'] || '');
+  const currentShader = profileShader || baseShader;
+  const basePath = canonicalShaderPath(currentShader || baseShader);
+  if (!basePath) return false;
+
+  const token = shaderLevelText(level);
+  const statePath = path.join(path.dirname(basePath), 'blackhole-live-level.txt');
+  const stateKey = `${token}|${basePath}`;
+  try {
+    if (fs.readFileSync(statePath, 'utf8').trim() === stateKey &&
+        /_live[01]\.hlsl$/i.test(currentShader) &&
+        fs.existsSync(currentShader)) {
+      return false;
+    }
+  } catch {}
+
+  const sourcePath = fs.existsSync(currentShader)
+    ? currentShader
+    : (fs.existsSync(basePath) ? basePath : baseShader);
+  if (!fs.existsSync(sourcePath)) return false;
+
+  let text;
+  try {
+    text = fs.readFileSync(sourcePath, 'utf8');
+  } catch {
+    return false;
+  }
+
+  const nextText = text.replace(/#define\s+TOKEN_LEVEL\s+-?\d+(?:\.\d+)?/, `#define TOKEN_LEVEL ${token}`);
+  if (nextText === text && !text.includes(`#define TOKEN_LEVEL ${token}`)) return false;
+
+  const slot = /_live0\.hlsl$/i.test(currentShader) ? 1 : 0;
+  const targetPath = liveShaderPath(basePath, slot);
+  try {
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    const tmpShader = `${targetPath}.tmp-${process.pid}`;
+    fs.writeFileSync(tmpShader, nextText);
+    fs.renameSync(tmpShader, targetPath);
+
+    if (profile && wt) {
+      const nextProfilePath = toWindowsPath(targetPath);
+      if (profile['experimental.pixelShaderPath'] !== nextProfilePath) {
+        profile['experimental.pixelShaderPath'] = nextProfilePath;
+        const tmpSettings = `${wt.path}.tmp-${process.pid}`;
+        fs.writeFileSync(tmpSettings, `${JSON.stringify(wt.settings, null, 4)}${os.EOL}`);
+        fs.renameSync(tmpSettings, wt.path);
+      }
+    }
+    fs.writeFileSync(statePath, `${stateKey}${os.EOL}`);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function encodeLevel(level) {
@@ -130,6 +292,28 @@ function extractLevelFromJson(input) {
   return -1;
 }
 
+function extractClaudeUsageLevel(input) {
+  const usage = input?.message?.usage || input?.usage;
+  if (!usage || typeof usage !== 'object') return -1;
+
+  const explicitTotal = usage.total_tokens ?? usage.totalTokens;
+  const used = explicitTotal ?? [
+    usage.input_tokens,
+    usage.cache_creation_input_tokens,
+    usage.cache_read_input_tokens,
+    usage.output_tokens,
+  ];
+  const limit = input?.model_context_window ||
+    input?.context_window?.max_tokens ||
+    input?.context_window?.context_window_size ||
+    process.env.CLAUDE_BLACKHOLE_TOKEN_MAX ||
+    DEFAULT_CLAUDE_TOKEN_MAX;
+
+  return Array.isArray(used)
+    ? levelFromUsageParts(used, limit)
+    : levelFromUsage(used, limit);
+}
+
 function sqlString(value) {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
@@ -191,6 +375,37 @@ function rolloutLevel(rolloutPath) {
   return -1;
 }
 
+function transcriptLevel(transcriptPath) {
+  const localPath = normalizeLocalPath(transcriptPath);
+  if (!localPath) return -1;
+  const text = readTail(localPath, 4 * 1024 * 1024);
+  if (!text) return -1;
+
+  const lines = text.split('\n');
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const line = lines[i];
+    if (!line.includes('"usage"')) continue;
+    const event = safeJson(line);
+    if (!event) continue;
+    const lvl = extractClaudeUsageLevel(event);
+    if (lvl >= 0.0) return lvl;
+  }
+  return -1;
+}
+
+function claudeLevel(input) {
+  const direct = extractLevelFromJson(input);
+  if (direct >= 0.0) return direct;
+
+  const fromUsage = extractClaudeUsageLevel(input);
+  if (fromUsage >= 0.0) return fromUsage;
+
+  const fromTranscript = transcriptLevel(input?.transcript_path || input?.transcriptPath);
+  if (fromTranscript >= 0.0) return fromTranscript;
+
+  return 0.0;
+}
+
 function latestThreadRowsForCwd(cwd) {
   const columns = 'rollout_path,cwd,tokens_used,model';
   const startedAfter = threadStartClause();
@@ -228,37 +443,78 @@ function codexLevel(input) {
   return 0.0;
 }
 
-function writeBeacon(level) {
-  const seq = beaconSequence(level);
-  try {
-    fs.writeFileSync('/dev/tty', seq);
-    return;
-  } catch {
-    if (process.env.BLACKHOLE_DEBUG_STDOUT) process.stdout.write(seq);
+function writeTerminal(seq) {
+  const targets = process.platform === 'win32'
+    ? ['\\\\.\\CONOUT$']
+    : ['/dev/tty'];
+  for (const target of targets) {
+    try {
+      fs.writeFileSync(target, seq);
+      return true;
+    } catch {}
   }
+  if (process.env.BLACKHOLE_DEBUG_STDOUT) process.stdout.write(seq);
+  return false;
+}
+
+function writeBeacon(level) {
+  return writeTerminal(beaconSequence(level));
+}
+
+function clearBeacon() {
+  return writeTerminal(`${ESC}7${ESC}[999;1H${ESC}[0m          ${ESC}8`);
+}
+
+function publishLevel(level) {
+  writeBeacon(level);
+  updateShaderLevel(level);
+}
+
+function hideLevel() {
+  clearBeacon();
+  updateShaderLevel(-1.0);
 }
 
 function claudeStatusline() {
   const input = safeJson(readStdinIfPiped()) || {};
-  let level = extractLevelFromJson(input);
+  const event = input.hook_event_name || input.hookEventName;
+  if (event === 'SessionEnd') {
+    hideLevel();
+    return;
+  }
+  if (event === 'SessionStart') {
+    publishLevel(0.0);
+    return;
+  }
+
+  let level = claudeLevel(input);
   if (level < 0.0) level = 0.0;
+  level = Math.round(level * 100.0) / 100.0;
+  const minLevel = clamp(asNumber(process.env.CLAUDE_BLACKHOLE_MIN_LEVEL) ?? 0.0, 0.0, 1.0);
+  const outputLevel = Math.max(level, minLevel);
+  publishLevel(outputLevel);
+
+  if (process.env.CLAUDE_BLACKHOLE_SHOW_STATUSLINE !== '1') {
+    process.stdout.write(`${ansiBlock(outputLevel)}\n`);
+    return;
+  }
 
   const pct = Math.round(level * 100);
   const model = extractModel(input, 'Claude');
   const cwd = basenameAny(extractCwd(input));
   const suffix = cwd ? ` ${cwd}` : '';
-  process.stdout.write(`${ansiBlock(level)} ${bar(level, 10)} ${pct}% ${model}${suffix}\n`);
+  process.stdout.write(`${bar(level, 10)} ${pct}% ${model}${suffix}\n`);
 }
 
 function codexHook() {
   const input = safeJson(readStdinIfPiped()) || {};
-  writeBeacon(codexLevel(input));
+  publishLevel(codexLevel(input));
 }
 
 function codexBeacon() {
   const intervalMs = clamp(asNumber(process.env.CODEX_BLACKHOLE_INTERVAL_MS) || 1000, 250, 10000);
-  const minLevel = clamp(asNumber(process.env.CODEX_BLACKHOLE_MIN_LEVEL) ?? 0.18, 0.0, 1.0);
-  const paint = () => writeBeacon(Math.max(codexLevel({ cwd: process.cwd() }), minLevel));
+  const minLevel = clamp(asNumber(process.env.CODEX_BLACKHOLE_MIN_LEVEL) ?? 0.0, 0.0, 1.0);
+  const paint = () => publishLevel(Math.max(codexLevel({ cwd: process.cwd() }), minLevel));
   process.on('SIGINT', () => process.exit(0));
   process.on('SIGTERM', () => process.exit(0));
   paint();
@@ -278,6 +534,9 @@ if (mode === 'claude-statusline') {
 } else if (mode === 'beacon-test') {
   const level = levelFromPercent(process.argv[3] ?? '0');
   process.stdout.write(beaconSequence(level >= 0.0 ? level : 0.0));
+} else if (mode === 'level-test') {
+  const level = levelFromPercent(process.argv[3] ?? '0');
+  publishLevel(level >= 0.0 ? level : 0.0);
 } else {
   process.stderr.write(`unknown mode: ${mode}\n`);
   process.exit(2);

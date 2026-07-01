@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-exec node "/mnt/i/QtWorkData/MyTools/my_ghostty_blackhole/blackhole-windows-terminal/blackhole-statusline.js" codex-hook "$@"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+exec node "$script_dir/blackhole-statusline.js" codex-hook "$@"

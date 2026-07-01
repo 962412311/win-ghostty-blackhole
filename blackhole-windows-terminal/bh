@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo="/mnt/i/QtWorkData/MyTools/my_ghostty_blackhole"
-supervisor="$repo/blackhole-windows-terminal/codex-blackhole-supervisor.js"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+repo="$(cd "$script_dir/.." && pwd -P)"
+supervisor="$script_dir/codex-blackhole-supervisor.js"
 
 if ! command -v node >/dev/null 2>&1; then
   echo "node not found" >&2
@@ -13,14 +14,18 @@ mode="${1:-codex}"
 case "$mode" in
   auto)
     shift || true
-    exec node "$repo/blackhole-windows-terminal/bh-mode.js" open-codex "$@"
+    exec node "$script_dir/bh-mode.js" open-codex "$@"
     ;;
   demo|token|tokens|pomodoro|mode|status|current)
-    exec node "$repo/blackhole-windows-terminal/bh-mode.js" "$mode" --open
+    exec node "$script_dir/bh-mode.js" "$mode" --open
     ;;
   codex)
     shift || true
-    exec node "$repo/blackhole-windows-terminal/bh-mode.js" open-codex "$@"
+    exec node "$script_dir/bh-mode.js" open-codex "$@"
+    ;;
+  claude)
+    shift || true
+    exec node "$script_dir/bh-mode.js" open-claude "$@"
     ;;
   __run_codex)
     shift || true
@@ -33,13 +38,10 @@ Usage:
   bh pomodoro   Install pomodoro shader and open a new Blackhole tab.
   bh mode       Print the installed shader path and last requested mode.
   bh            Open a new Blackhole tab running WSL Codex.
+  bh claude     Open a new Blackhole tab running Windows Claude Code.
   bh codex      Open a new Blackhole tab running WSL Codex.
 EOF
     exit 0
-    ;;
-  claude)
-    echo "Claude Code blackhole mode is disabled. Run claude normally, without bh." >&2
-    exit 2
     ;;
   *)
     echo "Unknown mode: $mode" >&2
@@ -48,5 +50,5 @@ EOF
     ;;
 esac
 
-node "$repo/blackhole-windows-terminal/bh-mode.js" token >/dev/null
+node "$script_dir/bh-mode.js" token >/dev/null
 exec node "$supervisor" "$@"

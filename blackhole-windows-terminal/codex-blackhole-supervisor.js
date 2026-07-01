@@ -6,11 +6,26 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const toolRepo = '/mnt/i/QtWorkData/MyTools/my_ghostty_blackhole';
+const toolDir = __dirname;
 const targetCwd = process.env.BLACKHOLE_TARGET_CWD || process.cwd();
-const beaconJs = path.join(toolRepo, 'blackhole-windows-terminal', 'blackhole-statusline.js');
+const beaconJs = path.join(toolDir, 'blackhole-statusline.js');
+const fallbackCodex = path.join(os.homedir(), '.codex', 'npm-global', 'bin', 'codex');
+
+function commandPath(command) {
+  try {
+    return childProcess.execFileSync('sh', ['-lc', `command -v ${command}`], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 1000,
+    }).trim();
+  } catch {
+    return '';
+  }
+}
+
 const realCodex = process.env.CODEX_BLACKHOLE_CODEX_BIN ||
-  path.join(os.homedir(), '.codex', 'npm-global', 'bin', 'codex');
+  commandPath('codex') ||
+  fallbackCodex;
 
 function signalExitCode(signal) {
   const signals = { SIGHUP: 1, SIGINT: 2, SIGTERM: 15 };
