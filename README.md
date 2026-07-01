@@ -1,7 +1,9 @@
 # win-ghostty-blackhole
 
-Windows Terminal 黑洞像素着色器项目。核心 shader 基于
-`ghostty-blackhole-src/` 中的 Ghostty 原始黑洞源码移植，当前支持：
+Windows Terminal 黑洞像素着色器项目。核心 shader 基于原仓库
+[s0xDk/ghostty-blackhole](https://github.com/s0xDk/ghostty-blackhole)
+中的 Ghostty blackhole shader 源码移植；`ghostty-blackhole-src/`
+是本地参考检出目录。当前支持：
 
 - `bh demo`：打开独立动态黑洞演示。
 - `bh token`：打开手动 token 测试模式。
