@@ -11,6 +11,10 @@ Windows Terminal 黑洞像素着色器项目。核心 shader 基于原仓库
 - `bh codex` 或 `bh`：在 Blackhole 终端中启动 WSL Codex，并按真实上下文比例驱动黑洞。
 - `bh claude`：在 Blackhole 终端中启动 Windows Claude Code，并接入 token/statusLine 模式。
 
+番茄钟/时钟模式在 Windows Terminal 下只负责视觉表现：55/5 周期和黑洞增长/收缩
+公式可用，但 Windows Terminal shader 不能读取真实系统时间、不能检测终端输入空闲，
+也不能触发响铃、通知或弹窗。
+
 ![Blackhole demo](docs/demo.gif)
 
 ## 快速使用

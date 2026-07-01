@@ -174,6 +174,25 @@ node blackhole-windows-terminal\blackhole-statusline.js level-test 0.5
 - `CLAUDE_BLACKHOLE_MIN_LEVEL`：Claude 初始显示地板，默认 `0`。
 - `CLAUDE_BLACKHOLE_SHOW_STATUSLINE=1`：显示 Claude 调试文本状态栏。
 
+## 番茄钟/时钟模式边界
+
+`bh pomodoro` / `bh clock` 在 Windows Terminal 中是视觉模式，不是完整计时器应用。
+
+可复现：
+
+- 55/5 周期按本地墙钟推进。
+- 黑洞按工作段进度增长，并在休息窗口前收缩。
+- `BLACKHOLE_POMODORO_TIME_SCALE=100` 可用于快速验证周期变化。
+
+不可复现：
+
+- Windows Terminal shader 不能直接读取真实系统时间，只能使用启动脚本写入的
+  `POMODORO_WALL_OFFSET`。
+- Windows Terminal shader 不能读取 Ghostty 的 `iTimeCursorChange`，因此不能按终端输入空闲淡出。
+- shader 不能触发响铃、通知、弹窗或休息提醒。
+- Windows Terminal profile 的 shader 路径是全局配置，不提供每个标签页完全独立的
+  shader 参数状态。
+
 ## 归档包复现验证
 
 ```bash

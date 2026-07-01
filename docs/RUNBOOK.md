@@ -109,6 +109,12 @@ set BLACKHOLE_POMODORO_TIME_SCALE=
 
 确认后重新运行 `bh pomodoro` 恢复真实速度。
 
+该模式的 Windows Terminal 兼容边界：
+
+- 可以验证 55/5 墙钟周期和黑洞视觉变化。
+- 不能验证终端输入空闲淡出；Windows Terminal 没有 Ghostty 的 `iTimeCursorChange`。
+- 不能触发响铃、通知、弹窗或休息提醒；如需这些行为，需要额外的宿主脚本或应用层逻辑。
+
 ### `bh codex` 模型和手动 Codex 不一致
 
 `codex-blackhole-supervisor.js` 会优先使用 WSL `PATH` 上的 `codex`。如果仍不一致：

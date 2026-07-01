@@ -64,4 +64,6 @@ OK: 42 model constants, 3 local tuning constants, 55 formula anchors, and 7 host
 - `ghostty-blackhole-src/` 是上游参考源码，源码树 Git 忽略；复现归档包会包含它，便于离线校验。
 - 不要直接手改 Windows Terminal `settings.json` 中的 live shader 路径；运行
   `bh token`、`bh pomodoro` 或 `bh mode` 让脚本维护。
+- 番茄钟/时钟模式只承诺视觉周期；Windows Terminal shader 无法原样实现系统时间
+  uniform、输入空闲检测、响铃、通知、弹窗或每标签页独立 shader 参数。
 - 视觉效果最终以真实 Windows Terminal 窗口确认。

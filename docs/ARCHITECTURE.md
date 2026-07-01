@@ -35,6 +35,22 @@
 uniform，无法在 shader 内判断终端输入空闲，因此 idle fade 固定为未空闲。测试时可
 临时设置 `BLACKHOLE_POMODORO_TIME_SCALE=100` 快速观察一轮变化。
 
+### 番茄钟兼容边界
+
+Windows Terminal 版可依赖的能力：
+
+- 按本地墙钟推进 55/5 周期。
+- 使用原版的增长、收缩、尺寸和漂移公式。
+- 通过 `BLACKHOLE_POMODORO_TIME_SCALE` 快速验证周期变化。
+
+确认无法在纯 Windows Terminal shader 中原样实现的能力：
+
+- 直接读取真实系统时间；只能由启动脚本写入 `POMODORO_WALL_OFFSET`。
+- 直接读取 Ghostty 的 `iTimeCursorChange` 或等价输入空闲时间；idle fade 固定为未空闲。
+- 触发系统计时器行为，例如响铃、通知、弹窗或休息提醒。
+- 给每个 Windows Terminal 标签页提供完全独立的 shader 参数状态；profile 的
+  `experimental.pixelShaderPath` 是全局配置，项目通过 runtime shader 文件和路径切换刷新。
+
 ## Token 数据通道
 
 Windows Terminal shader 无法直接读取进程内变量，因此项目使用双通道：
