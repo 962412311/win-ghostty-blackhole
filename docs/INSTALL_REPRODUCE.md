@@ -21,6 +21,22 @@
 - Windows 中安装 Claude Code，并且 `cmd.exe` 中 `where claude` 能找到入口。
 - Claude Code hook 需要 bash 执行器；Windows 自带 WSL bash 或 Git/MSYS bash 均可。
 
+## 获取项目
+
+推荐使用复现归档包。归档包包含 `ghostty-blackhole-src/`，可以直接运行严格
+shader 公式校验。
+
+如果从公开 GitHub 仓库克隆源码：
+
+```cmd
+git clone https://github.com/962412311/win-ghostty-blackhole.git C:\Tools\win-ghostty-blackhole
+cd /d C:\Tools\win-ghostty-blackhole
+git clone https://github.com/s0xDk/ghostty-blackhole.git ghostty-blackhole-src
+```
+
+`ghostty-blackhole-src/` 只用于对比上游 shader 公式和生成复现包；日常运行
+`bh demo`、`bh codex`、`bh claude` 不依赖该目录。
+
 ## 解包位置
 
 建议把归档包解到一个不会频繁改名的位置，例如：

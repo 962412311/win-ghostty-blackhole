@@ -4,6 +4,14 @@
 
 ## 基础健康检查
 
+`blackhole-windows-terminal/verify-blackhole-port.js` 需要
+`ghostty-blackhole-src/blackhole.glsl`。归档包已经包含该目录；如果是从 GitHub
+仓库克隆源码，先运行：
+
+```bash
+git clone https://github.com/s0xDk/ghostty-blackhole.git ghostty-blackhole-src
+```
+
 归档包环境：
 
 ```bash

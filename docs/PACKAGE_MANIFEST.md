@@ -9,10 +9,14 @@
 - `README.md`
 - `AGENTS.md`
 - `docs/`
+  - `docs/demo.gif`
 - `scripts/`
 - `blackhole-windows-terminal/`
 - `ghostty-blackhole-src/`
 - `.gitignore`
+
+`ghostty-blackhole-src/` 在 Git 仓库中被忽略，但复现归档包必须包含它，用于
+离线运行 `blackhole-windows-terminal/verify-blackhole-port.js`。
 
 ## 归档包应排除
 
@@ -39,3 +43,9 @@ tar -tzf win-ghostty-blackhole-repro-2026-07-01.tar.gz | rg '(^\./\.git/|/\.git/
 ```
 
 最后一条命令不应输出任何条目。
+
+如果从 GitHub clone 的源码生成归档包，先补齐上游参考源码：
+
+```bash
+git clone https://github.com/s0xDk/ghostty-blackhole.git ghostty-blackhole-src
+```

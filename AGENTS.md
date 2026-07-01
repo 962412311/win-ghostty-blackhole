@@ -13,6 +13,8 @@
 
 - 黑洞主体算法和公式以 `ghostty-blackhole-src/blackhole.glsl` 为参考源。
 - `blackhole-windows-terminal/verify-blackhole-port.js` 必须持续校验上游公式锚点。
+- `ghostty-blackhole-src/` 不提交到 Git；从 GitHub clone 后如需严格校验，先运行
+  `git clone https://github.com/s0xDk/ghostty-blackhole.git ghostty-blackhole-src`。
 - Windows 本地视觉调优只允许集中在 `TOKEN_AREA_MIN`、`TOKEN_CALM`、`TOKEN_RUSH`
   等明确列入 verifier 的 local tuning 常量中。
 - Windows Terminal 真实视觉验证以用户肉眼确认为准；不要默认依赖截图自动判断。
