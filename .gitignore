@@ -1,6 +1,9 @@
 __pycache__/
 *.pyc
-dist/
+dist/*
+!dist/
+!dist/win-ghostty-blackhole-repro-2026-07-01.tar.gz
+!dist/win-ghostty-blackhole-repro-2026-07-01.sha256
 
 # External reference checkout used by the verifier.
 ghostty-blackhole-src/

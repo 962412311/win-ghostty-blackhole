@@ -4,6 +4,11 @@
 
 归档包目标：把当前可复用内容打包，便于另一台 Windows + WSL 电脑快速复现。
 
+Git 仓库跟踪最新复现包：
+
+- `dist/win-ghostty-blackhole-repro-2026-07-01.tar.gz`
+- `dist/win-ghostty-blackhole-repro-2026-07-01.sha256`
+
 ## 归档包应包含
 
 - `README.md`
@@ -32,6 +37,9 @@
 ```bash
 bash scripts/package-repro.sh
 ```
+
+重新生成后需要把最新 `dist/win-ghostty-blackhole-repro-2026-07-01.*` 一并提交，
+确保 GitHub 上的复现包和源码一致。
 
 生成后检查：
 

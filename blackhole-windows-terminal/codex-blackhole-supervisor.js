@@ -54,24 +54,31 @@ const childEnv = {
   ...process.env,
   BLACKHOLE_TARGET_CWD: targetCwd,
   CODEX_BLACKHOLE_STARTED_AT_MS: String(startedAtMs),
+  CODEX_BLACKHOLE_SUPERVISOR_PID: String(process.pid),
 };
+
+const codex = childProcess.spawn(realCodex, process.argv.slice(2), {
+  cwd: targetCwd,
+  detached: false,
+  env: {
+    ...childEnv,
+    CODEX_BLACKHOLE_DISABLE: '1',
+  },
+  stdio: 'inherit',
+});
 
 let beacon = null;
 if (fs.existsSync(beaconJs)) {
   beacon = childProcess.spawn(process.execPath, [beaconJs, 'codex-beacon'], {
     cwd: targetCwd,
     detached: false,
-    env: childEnv,
+    env: {
+      ...childEnv,
+      CODEX_BLACKHOLE_CODEX_PID: String(codex.pid),
+    },
     stdio: 'ignore',
   });
 }
-
-const codex = childProcess.spawn(realCodex, process.argv.slice(2), {
-  cwd: targetCwd,
-  detached: false,
-  env: childEnv,
-  stdio: 'inherit',
-});
 
 let exiting = false;
 

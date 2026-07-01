@@ -7,6 +7,7 @@ const path = require('path');
 
 const ESC = '\x1b';
 const DEFAULT_CODEX_STATE = path.join(os.homedir(), '.codex', 'state_5.sqlite');
+const DEFAULT_CODEX_SHELL_SNAPSHOTS = path.join(os.homedir(), '.codex', 'shell_snapshots');
 const DEFAULT_CODEX_TOKEN_MAX = 25000000;
 const DEFAULT_CLAUDE_TOKEN_MAX = 200000;
 const DEFAULT_WINDOWS_USER = 'YOUR_USER';
@@ -154,12 +155,53 @@ function liveShaderPath(basePath, slot) {
   return String(basePath).replace(/(\.hlsl)$/i, `_live${slot}$1`);
 }
 
+function liveOwnerPath(basePath) {
+  return path.join(path.dirname(basePath), 'blackhole-live-owner.json');
+}
+
+function runtimeBaseShaderPath() {
+  return canonicalShaderPath(normalizeLocalPath(process.env.BLACKHOLE_SHADER_PATH || defaultRuntimeShader()));
+}
+
+function readLiveOwner(basePath) {
+  try {
+    const text = fs.readFileSync(liveOwnerPath(basePath), 'utf8').trim();
+    if (!text) return '';
+    const parsed = safeJson(text);
+    return parsed?.id || text;
+  } catch {
+    return '';
+  }
+}
+
+function hasLiveOwnerAccess(basePath, options = {}) {
+  if (options.bypassOwner || process.env.BLACKHOLE_BYPASS_OWNER === '1') return true;
+  const currentOwner = readLiveOwner(basePath);
+  if (!currentOwner) return true;
+  const processOwner = process.env.BLACKHOLE_LIVE_OWNER || '';
+  return processOwner !== '' && processOwner === currentOwner;
+}
+
+function claimLiveOwner(label) {
+  const basePath = runtimeBaseShaderPath();
+  const id = `${Date.now()}-${process.pid}-${Math.random().toString(16).slice(2)}`;
+  const owner = {
+    id,
+    label: label || 'blackhole',
+    pid: process.pid,
+    createdAt: new Date().toISOString(),
+  };
+  fs.mkdirSync(path.dirname(basePath), { recursive: true });
+  fs.writeFileSync(liveOwnerPath(basePath), `${JSON.stringify(owner, null, 2)}${os.EOL}`);
+  return id;
+}
+
 function shaderLevelText(level) {
   if (level < 0.0) return '-1';
   return (Math.round(clamp(level, 0.0, 1.0) * 100.0) / 100.0).toFixed(4);
 }
 
-function updateShaderLevel(level) {
+function updateShaderLevel(level, options = {}) {
   if (process.env.BLACKHOLE_DISABLE_SHADER_LEVEL === '1') return false;
 
   const baseShader = normalizeLocalPath(process.env.BLACKHOLE_SHADER_PATH || defaultRuntimeShader());
@@ -169,6 +211,7 @@ function updateShaderLevel(level) {
   const currentShader = profileShader || baseShader;
   const basePath = canonicalShaderPath(currentShader || baseShader);
   if (!basePath) return false;
+  if (!hasLiveOwnerAccess(basePath, options)) return false;
 
   const token = shaderLevelText(level);
   const statePath = path.join(path.dirname(basePath), 'blackhole-live-level.txt');
@@ -333,11 +376,133 @@ function sqliteRows(sql) {
   }
 }
 
-function threadStartClause() {
+function threadActivityClause() {
   const startedAtMs = asNumber(process.env.CODEX_BLACKHOLE_STARTED_AT_MS);
   if (startedAtMs === null) return '';
   const threshold = Math.max(0, Math.floor(startedAtMs - 5000));
-  return ` and coalesce(created_at_ms, created_at * 1000) >= ${threshold} `;
+  return ' and max(' +
+    'coalesce(created_at_ms, created_at * 1000, 0),' +
+    'coalesce(recency_at_ms, recency_at * 1000, 0)' +
+    `) >= ${threshold} `;
+}
+
+function processTreePids(rootPid) {
+  const root = Math.trunc(asNumber(rootPid) ?? -1);
+  if (root <= 0) return [];
+  try {
+    const out = childProcess.execFileSync(
+      'ps',
+      ['-eo', 'pid=,ppid='],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 1000 },
+    );
+    const children = new Map();
+    for (const line of out.split('\n')) {
+      const match = line.trim().match(/^(\d+)\s+(\d+)$/);
+      if (!match) continue;
+      const pid = Number(match[1]);
+      const ppid = Number(match[2]);
+      if (!children.has(ppid)) children.set(ppid, []);
+      children.get(ppid).push(pid);
+    }
+
+    const found = [];
+    const seen = new Set();
+    const queue = [root];
+    while (queue.length > 0 && found.length < 256) {
+      const pid = queue.shift();
+      if (seen.has(pid)) continue;
+      seen.add(pid);
+      found.push(pid);
+      for (const child of children.get(pid) || []) queue.push(child);
+    }
+    return found;
+  } catch {
+    return [root];
+  }
+}
+
+function isCodexRolloutPath(filePath) {
+  return /[\\/]\.codex[\\/]sessions[\\/].*[\\/]rollout-[^\\/]+\.jsonl$/.test(String(filePath));
+}
+
+function processOpenRolloutPath(rootPid) {
+  const candidates = [];
+  for (const pid of processTreePids(rootPid)) {
+    const fdDir = `/proc/${pid}/fd`;
+    let entries;
+    try {
+      entries = fs.readdirSync(fdDir);
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      let target;
+      try {
+        target = fs.readlinkSync(path.join(fdDir, entry)).replace(/ \\(deleted\\)$/, '');
+      } catch {
+        continue;
+      }
+      if (!isCodexRolloutPath(target) || !fs.existsSync(target)) continue;
+      try {
+        candidates.push({ path: target, mtimeMs: fs.statSync(target).mtimeMs });
+      } catch {}
+    }
+  }
+  candidates.sort((a, b) => b.mtimeMs - a.mtimeMs || a.path.localeCompare(b.path));
+  return candidates[0]?.path || '';
+}
+
+function rolloutThreadId(rolloutPath) {
+  const match = basenameAny(rolloutPath).match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i);
+  return match ? match[1] : '';
+}
+
+function shellSnapshotThreadId(filePath) {
+  const match = basenameAny(filePath).match(/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\./i);
+  return match ? match[1] : '';
+}
+
+function latestShellSnapshotForSupervisor(supervisorPid) {
+  const pid = Math.trunc(asNumber(supervisorPid) ?? -1);
+  if (pid <= 0) return null;
+  const dir = process.env.CODEX_BLACKHOLE_SHELL_SNAPSHOTS || DEFAULT_CODEX_SHELL_SNAPSHOTS;
+  let entries;
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+
+  const candidates = [];
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith('.sh')) continue;
+    const threadId = shellSnapshotThreadId(entry.name);
+    if (!threadId) continue;
+    const filePath = path.join(dir, entry.name);
+    let stat;
+    try {
+      stat = fs.statSync(filePath);
+    } catch {
+      continue;
+    }
+    candidates.push({ filePath, threadId, mtimeMs: stat.mtimeMs });
+  }
+  candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+  const needle = `CODEX_BLACKHOLE_SUPERVISOR_PID=${pid}`;
+  for (const candidate of candidates.slice(0, 200)) {
+    const text = readTail(candidate.filePath, 16 * 1024);
+    if (text.includes(needle)) return candidate;
+  }
+  return null;
+}
+
+function rolloutMtimeMs(rolloutPath) {
+  try {
+    return fs.statSync(rolloutPath).mtimeMs;
+  } catch {
+    return 0;
+  }
 }
 
 function readTail(filePath, maxBytes) {
@@ -393,6 +558,23 @@ function transcriptLevel(transcriptPath) {
   return -1;
 }
 
+function extractSessionId(input) {
+  return input?.session_id || input?.sessionId || input?.session?.id || '';
+}
+
+function transcriptSessionId(transcriptPath) {
+  const localPath = normalizeLocalPath(transcriptPath);
+  const name = basenameAny(localPath);
+  const match = name.match(/^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i);
+  return match ? match[1] : '';
+}
+
+function transcriptMatchesSession(input, transcriptPath) {
+  const sessionId = extractSessionId(input);
+  const transcriptId = transcriptSessionId(transcriptPath);
+  return !sessionId || !transcriptId || sessionId.toLowerCase() === transcriptId.toLowerCase();
+}
+
 function claudeLevel(input) {
   const direct = extractLevelFromJson(input);
   if (direct >= 0.0) return direct;
@@ -400,7 +582,10 @@ function claudeLevel(input) {
   const fromUsage = extractClaudeUsageLevel(input);
   if (fromUsage >= 0.0) return fromUsage;
 
-  const fromTranscript = transcriptLevel(input?.transcript_path || input?.transcriptPath);
+  const transcriptPath = input?.transcript_path || input?.transcriptPath;
+  if (!transcriptMatchesSession(input, transcriptPath)) return 0.0;
+
+  const fromTranscript = transcriptLevel(transcriptPath);
   if (fromTranscript >= 0.0) return fromTranscript;
 
   return 0.0;
@@ -408,35 +593,68 @@ function claudeLevel(input) {
 
 function latestThreadRowsForCwd(cwd) {
   const columns = 'rollout_path,cwd,tokens_used,model';
-  const startedAfter = threadStartClause();
+  const activeAfterLaunch = threadActivityClause();
   if (cwd) {
     const rows = sqliteRows(
       `select ${columns} from threads ` +
       `where archived = 0 and lower(cwd) = lower(${sqlString(cwd)}) ` +
-      startedAfter +
+      activeAfterLaunch +
       'order by updated_at_ms desc, updated_at desc limit 1;',
     );
     if (rows.length > 0) return rows;
   }
   return sqliteRows(
     `select ${columns} from threads ` +
-    `where archived = 0 ${startedAfter} ` +
+    `where archived = 0 ${activeAfterLaunch} ` +
     'order by updated_at_ms desc, updated_at desc limit 1;',
   );
+}
+
+function threadRowsForRollout(rolloutPath) {
+  if (!rolloutPath) return [];
+  return sqliteRows(
+    'select rollout_path,cwd,tokens_used,model from threads ' +
+    `where rollout_path = ${sqlString(rolloutPath)} limit 1;`,
+  );
+}
+
+function levelFromThreadRow(row) {
+  if (!row) return -1;
+  const fromRollout = rolloutLevel(row.rollout_path);
+  if (fromRollout >= 0.0) return fromRollout;
+
+  const max = asNumber(process.env.CODEX_BLACKHOLE_TOKEN_MAX) || DEFAULT_CODEX_TOKEN_MAX;
+  return levelFromUsage(row.tokens_used, max);
 }
 
 function codexLevel(input) {
   const direct = extractLevelFromJson(input);
   if (direct >= 0.0) return direct;
 
+  const codexPid = asNumber(process.env.CODEX_BLACKHOLE_CODEX_PID);
+  if (codexPid !== null) {
+    const rolloutPath = processOpenRolloutPath(codexPid);
+    if (!rolloutPath) return 0.0;
+
+    const supervisorPid = asNumber(process.env.CODEX_BLACKHOLE_SUPERVISOR_PID);
+    const snapshot = latestShellSnapshotForSupervisor(supervisorPid);
+    const activeThreadId = rolloutThreadId(rolloutPath);
+    if (snapshot &&
+        activeThreadId &&
+        snapshot.threadId !== activeThreadId &&
+        snapshot.mtimeMs >= rolloutMtimeMs(rolloutPath)) {
+      return 0.0;
+    }
+
+    const row = threadRowsForRollout(rolloutPath)[0] || { rollout_path: rolloutPath, tokens_used: 0 };
+    const fromProcess = levelFromThreadRow(row);
+    return fromProcess >= 0.0 ? fromProcess : 0.0;
+  }
+
   const cwd = extractCwd(input) || process.cwd();
   const rows = latestThreadRowsForCwd(cwd);
   for (const row of rows) {
-    const fromRollout = rolloutLevel(row.rollout_path);
-    if (fromRollout >= 0.0) return fromRollout;
-
-    const max = asNumber(process.env.CODEX_BLACKHOLE_TOKEN_MAX) || DEFAULT_CODEX_TOKEN_MAX;
-    const fallback = levelFromUsage(row.tokens_used, max);
+    const fallback = levelFromThreadRow(row);
     if (fallback >= 0.0) return fallback;
   }
 
@@ -465,14 +683,14 @@ function clearBeacon() {
   return writeTerminal(`${ESC}7${ESC}[999;1H${ESC}[0m          ${ESC}8`);
 }
 
-function publishLevel(level) {
+function publishLevel(level, options = {}) {
   writeBeacon(level);
-  updateShaderLevel(level);
+  return updateShaderLevel(level, options);
 }
 
-function hideLevel() {
+function hideLevel(options = {}) {
   clearBeacon();
-  updateShaderLevel(-1.0);
+  return updateShaderLevel(-1.0, options);
 }
 
 function claudeStatusline() {
@@ -514,7 +732,25 @@ function codexHook() {
 function codexBeacon() {
   const intervalMs = clamp(asNumber(process.env.CODEX_BLACKHOLE_INTERVAL_MS) || 1000, 250, 10000);
   const minLevel = clamp(asNumber(process.env.CODEX_BLACKHOLE_MIN_LEVEL) ?? 0.0, 0.0, 1.0);
-  const paint = () => publishLevel(Math.max(codexLevel({ cwd: process.cwd() }), minLevel));
+  if (!process.env.BLACKHOLE_LIVE_OWNER) {
+    process.env.BLACKHOLE_LIVE_OWNER = claimLiveOwner('codex-beacon');
+  }
+  const supervisorPid = asNumber(process.env.CODEX_BLACKHOLE_SUPERVISOR_PID);
+  const supervisorAlive = () => {
+    if (supervisorPid === null) return true;
+    try {
+      process.kill(supervisorPid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const paint = () => {
+    if (!supervisorAlive() || !hasLiveOwnerAccess(runtimeBaseShaderPath())) {
+      process.exit(0);
+    }
+    publishLevel(Math.max(codexLevel({ cwd: process.cwd() }), minLevel));
+  };
   process.on('SIGINT', () => process.exit(0));
   process.on('SIGTERM', () => process.exit(0));
   paint();
@@ -536,7 +772,9 @@ if (mode === 'claude-statusline') {
   process.stdout.write(beaconSequence(level >= 0.0 ? level : 0.0));
 } else if (mode === 'level-test') {
   const level = levelFromPercent(process.argv[3] ?? '0');
-  publishLevel(level >= 0.0 ? level : 0.0);
+  publishLevel(level >= 0.0 ? level : 0.0, { bypassOwner: true });
+} else if (mode === 'claim-owner') {
+  process.stdout.write(`${claimLiveOwner(process.argv[3] || 'manual')}\n`);
 } else {
   process.stderr.write(`unknown mode: ${mode}\n`);
   process.exit(2);

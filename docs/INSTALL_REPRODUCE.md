@@ -7,7 +7,9 @@
 
 - `bh demo`：打开 Windows Terminal `Blackhole` 标签页，显示动态黑洞演示。
 - `bh codex`：在 `Blackhole` 标签页启动 WSL Codex，黑洞按 Codex 上下文比例线性变化。
+- Codex `resume` 会跟随实际打开的 rollout；`new` 会回到最小比例。
 - `bh claude`：在 `Blackhole` 标签页启动 Windows Claude Code，黑洞按 Claude Code 上下文比例变化。
+- Claude Code `new` 不会继承旧 transcript 的黑洞大小。
 - 用户向上滚动会话或会话内容未填满窗口时，黑洞仍通过 shader `TOKEN_LEVEL`
   fallback 保持显示。
 
@@ -23,14 +25,26 @@
 
 ## 获取项目
 
-推荐使用复现归档包。归档包包含 `ghostty-blackhole-src/`，可以直接运行严格
-shader 公式校验。
+推荐使用 GitHub 仓库中的复现归档包：
+
+```text
+dist/win-ghostty-blackhole-repro-2026-07-01.tar.gz
+dist/win-ghostty-blackhole-repro-2026-07-01.sha256
+```
+
+归档包包含 `ghostty-blackhole-src/`，可以直接运行严格 shader 公式校验。
 
 如果从公开 GitHub 仓库克隆源码：
 
 ```cmd
 git clone https://github.com/962412311/win-ghostty-blackhole.git C:\Tools\win-ghostty-blackhole
 cd /d C:\Tools\win-ghostty-blackhole
+```
+
+Git 源码不跟踪 `ghostty-blackhole-src/`。如果不使用 `dist/` 归档包、但需要运行严格
+公式校验或重新打包，再补齐上游参考源码：
+
+```cmd
 git clone https://github.com/s0xDk/ghostty-blackhole.git ghostty-blackhole-src
 ```
 
@@ -151,6 +165,7 @@ node blackhole-windows-terminal\blackhole-statusline.js level-test 0.5
 - `CODEX_BLACKHOLE_MIN_LEVEL`：Codex 初始显示地板，默认 `0`。
 - `CODEX_BLACKHOLE_TOKEN_MAX`：Codex token 上限估算，默认 `25000000`。
 - `CODEX_BLACKHOLE_INTERVAL_MS`：Codex beacon 刷新间隔，默认 `1000`。
+- `CODEX_BLACKHOLE_SHELL_SNAPSHOTS`：Codex `new` 空会话检测的 shell snapshot 目录。
 - `CLAUDE_BLACKHOLE_MIN_LEVEL`：Claude 初始显示地板，默认 `0`。
 - `CLAUDE_BLACKHOLE_SHOW_STATUSLINE=1`：显示 Claude 调试文本状态栏。
 

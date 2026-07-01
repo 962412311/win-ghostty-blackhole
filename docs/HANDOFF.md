@@ -10,15 +10,22 @@
 - `bh codex` 可在 Windows Terminal 中启动 WSL Codex，并按上下文比例驱动黑洞。
 - `bh claude` 可在 Windows Terminal 中启动 Windows Claude Code，并按上下文比例驱动黑洞。
 - Codex 新会话初始等级回到最小比例，不继承旧同目录会话。
+- Codex 通过 `resume` 切换旧会话后，会按该 Codex 进程实际打开的 rollout 继续驱动黑洞。
+- Codex 通过 `new` 切到空会话后，即使旧 rollout 句柄还未关闭，也会根据 shell snapshot 回到最小比例。
 - Codex 启动时优先使用 WSL `PATH` 上的 `codex`，保持手动启动时的默认模型和推理强度。
 - Claude Code bridge 自动安装到 Windows `~/.claude`，兼容 `/mnt/c/...` 和 `/c/...` bash 环境。
+- Claude Code 会校验 `session_id` 和 transcript 文件名，`new` 后不会继承旧 transcript 的大小。
 - 去除了可见橙色色块；当前兼容色块为近黑色。
 - 通过 shader `TOKEN_LEVEL` live0/live1 fallback 解决内容未填满窗口、滚动 scrollback 后黑洞消失的问题。
+- 通过 `blackhole-live-owner.json` 和旧 Codex beacon 清理，避免多个上下文写入者
+  抢同一个 runtime shader 导致黑洞反复变大变小。
 - 初始黑洞调小，移动速度调慢：
   - `TOKEN_AREA_MIN = 0.0030`
   - `TOKEN_CALM = 0.0200`
   - `TOKEN_RUSH = 0.5500`
 - WSL 和 Windows 入口已改为按脚本所在目录自定位，适合打包迁移。
+- 最新复现归档跟踪在 `dist/win-ghostty-blackhole-repro-2026-07-01.*`，包含
+  `ghostty-blackhole-src/`，可在新电脑离线运行严格 shader 校验。
 
 ## 当前主要入口
 
@@ -52,7 +59,7 @@ OK: 42 model constants, 3 local tuning constants, 43 formula anchors, and 3 host
 
 - 旧的 `codex-blackhole-launch.sh`、`codex-blackhole-hook.sh`、
   `codex-blackhole-wsl.cmd` 已改成自定位，但主入口仍建议使用 `bh` / `bh.cmd`。
-- `ghostty-blackhole-src/` 是上游参考源码，Git 忽略；复现归档包会包含它，便于离线校验。
+- `ghostty-blackhole-src/` 是上游参考源码，源码树 Git 忽略；复现归档包会包含它，便于离线校验。
 - 不要直接手改 Windows Terminal `settings.json` 中的 live shader 路径；运行 `bh token`
   或 `bh mode` 让脚本维护。
 - 视觉效果最终以真实 Windows Terminal 窗口确认。

@@ -79,13 +79,19 @@ git diff --check
 
 ## 复现包
 
-生成归档：
+仓库会跟踪最新复现归档：
+
+- `dist/win-ghostty-blackhole-repro-2026-07-01.tar.gz`
+- `dist/win-ghostty-blackhole-repro-2026-07-01.sha256`
+
+该归档包含上游参考目录 `ghostty-blackhole-src/`，新电脑可直接离线运行严格
+shader 校验。重新生成归档：
 
 ```bash
 bash scripts/package-repro.sh
 ```
 
-输出位于 `dist/`，归档内容和校验方法见
+输出位于 `dist/`，归档内容、排除规则和校验方法见
 [docs/PACKAGE_MANIFEST.md](docs/PACKAGE_MANIFEST.md)。
 
 ## 文档

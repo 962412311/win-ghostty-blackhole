@@ -68,6 +68,7 @@ function defaultClaudeDir() {
 const runtimeShader = process.env.BLACKHOLE_SHADER_PATH || defaultRuntimeShader();
 const wtSettingsPath = process.env.BLACKHOLE_WT_SETTINGS || defaultSettingsPath();
 const statePath = path.join(path.dirname(runtimeShader), 'blackhole-live-mode.txt');
+const ownerPath = path.join(path.dirname(runtimeShader), 'blackhole-live-owner.json');
 const claudeDir = process.env.BLACKHOLE_CLAUDE_DIR || defaultClaudeDir();
 const claudeSettingsPath = process.env.BLACKHOLE_CLAUDE_SETTINGS || path.join(claudeDir, 'settings.json');
 const distro = process.env.BLACKHOLE_WSL_DISTRO || 'Ubuntu';
@@ -171,6 +172,21 @@ function saveState(mode) {
   } catch {}
 }
 
+function claimLiveOwner(label) {
+  const id = `${Date.now()}-${process.pid}-${Math.random().toString(16).slice(2)}`;
+  const owner = {
+    id,
+    label: label || 'blackhole',
+    pid: process.pid,
+    createdAt: new Date().toISOString(),
+  };
+  try {
+    fs.mkdirSync(path.dirname(ownerPath), { recursive: true });
+    fs.writeFileSync(ownerPath, `${JSON.stringify(owner, null, 2)}${os.EOL}`);
+  } catch {}
+  return id;
+}
+
 function readState() {
   try {
     return fs.readFileSync(statePath, 'utf8').trim();
@@ -179,12 +195,61 @@ function readState() {
   }
 }
 
-function installMode(mode) {
+function stopLocalCodexBeacons() {
+  let out = '';
+  try {
+    out = childProcess.execFileSync('ps', ['-eo', 'pid=,args='], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      timeout: 1000,
+    });
+  } catch {
+    return;
+  }
+
+  for (const line of out.split('\n')) {
+    const match = line.trim().match(/^(\d+)\s+(.+)$/);
+    if (!match) continue;
+    const pid = Number(match[1]);
+    const args = match[2];
+    if (!Number.isInteger(pid) || pid === process.pid) continue;
+    if (!/blackhole-statusline\.js\s+codex-beacon/.test(args)) continue;
+    try {
+      process.kill(pid, 'SIGTERM');
+    } catch {}
+  }
+}
+
+function stopStaleCodexBeacons() {
+  if (process.env.BLACKHOLE_KEEP_OLD_BEACONS === '1') return;
+  if (process.platform !== 'win32') {
+    stopLocalCodexBeacons();
+    return;
+  }
+  try {
+    childProcess.spawnSync(
+      'C:\\Windows\\System32\\wsl.exe',
+      [
+        '-d', distro,
+        '--exec',
+        'sh',
+        '-lc',
+        "ps -eo pid=,args= | awk '/blackhole-statusline[.]js codex-beacon/ {print $1}' | xargs -r kill -TERM",
+      ],
+      { stdio: 'ignore', timeout: 1500 },
+    );
+  } catch {}
+}
+
+function installMode(mode, ownerLabel = mode) {
+  stopStaleCodexBeacons();
+  const ownerId = claimLiveOwner(ownerLabel);
   const define = modes.get(mode);
   fs.mkdirSync(path.dirname(runtimeShader), { recursive: true });
   fs.writeFileSync(runtimeShader, renderShader(define));
   updateWtProfile(runtimeShader);
   saveState(canonicalMode(mode));
+  return ownerId;
 }
 
 function loadClaudeSettings() {
@@ -196,10 +261,13 @@ function quoteSh(value) {
   return `'${String(value).replace(/'/g, "'\\''")}'`;
 }
 
-function claudeBridgeCommand(helperCmd) {
+function claudeBridgeCommand(helperCmd, ownerId) {
   const wslPath = windowsPathToWsl(helperCmd);
   const msysPath = wslPath.replace(/^\/mnt\/([a-zA-Z])\//, '/$1/');
-  return `p=${quoteSh(wslPath)}; [ -f "$p" ] || p=${quoteSh(msysPath)}; [ -f "$p" ] && bash "$p" || true`;
+  const ownerExport = ownerId
+    ? `BLACKHOLE_LIVE_OWNER=${quoteSh(ownerId)}; export BLACKHOLE_LIVE_OWNER; `
+    : '';
+  return `${ownerExport}p=${quoteSh(wslPath)}; [ -f "$p" ] || p=${quoteSh(msysPath)}; [ -f "$p" ] && bash "$p" || true`;
 }
 
 function isBlackholeClaudeCommand(command) {
@@ -223,7 +291,7 @@ function addClaudeHook(settings, event, command) {
   settings.hooks[event] = kept;
 }
 
-function installClaudeBridge() {
+function installClaudeBridge(ownerId) {
   fs.mkdirSync(claudeDir, { recursive: true });
   const helperJs = path.join(claudeDir, 'blackhole-statusline.js');
   const helperCmd = path.join(claudeDir, 'claude-blackhole-statusline.cmd');
@@ -232,7 +300,7 @@ function installClaudeBridge() {
   fs.copyFileSync(path.join(toolDir, 'claude-blackhole-statusline.cmd'), helperCmd);
   fs.copyFileSync(path.join(toolDir, 'claude-blackhole-statusline.sh'), helperSh);
 
-  const command = claudeBridgeCommand(helperSh);
+  const command = claudeBridgeCommand(helperSh, ownerId);
   const settings = loadClaudeSettings();
   settings.statusLine = { type: 'command', command };
   addClaudeHook(settings, 'SessionStart', command);
@@ -292,8 +360,8 @@ function windowsCwdToWsl(cwd) {
 }
 
 function openClaude(args) {
-  installMode('token');
-  installClaudeBridge();
+  const ownerId = installMode('token', 'claude');
+  installClaudeBridge(ownerId);
   const bhCmd = toWindowsPath(path.join(toolDir, 'bh.cmd'));
   const cwd = toWindowsPath(process.cwd());
   const extra = args.map(quoteCmd).join(' ');
@@ -308,7 +376,7 @@ function openClaude(args) {
 }
 
 function openCodex(args) {
-  installMode('token');
+  installMode('token', 'codex-launch');
   const wslCwd = process.platform === 'win32'
     ? windowsCwdToWsl(process.cwd())
     : process.cwd();
@@ -346,8 +414,8 @@ if (cmd === 'open-claude') {
 }
 
 if (cmd === 'install-claude' || cmd === 'install-claude-bridge') {
-  installMode('token');
-  console.log(`Claude blackhole bridge: ${installClaudeBridge()}`);
+  const ownerId = installMode('token', 'claude');
+  console.log(`Claude blackhole bridge: ${installClaudeBridge(ownerId)}`);
   console.log(toWindowsPath(runtimeShader));
   process.exit(0);
 }
@@ -363,7 +431,7 @@ if (!modes.has(cmd)) usage(2);
 
 const mode = canonicalMode(cmd);
 const shouldOpen = process.argv.slice(3).includes('--open');
-installMode(mode);
+installMode(mode, mode);
 if (shouldOpen) openBlackholeTab(mode);
 
 console.log(`Blackhole shader mode: ${mode}`);

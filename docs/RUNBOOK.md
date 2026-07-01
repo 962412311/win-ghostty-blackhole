@@ -94,6 +94,21 @@ command -v codex
 CODEX_BLACKHOLE_CODEX_BIN=/path/to/codex bh codex
 ```
 
+### Codex `resume` 后黑洞不随上下文变化
+
+当前版本优先绑定 `bh codex` 启动的 Codex 进程树实际打开的 rollout 文件。若 `resume`
+后仍不变化：
+
+```bash
+ps -eo pid,ppid,etime,cmd | rg 'codex|blackhole'
+ls -l /proc/<codex-pid>/fd | rg 'rollout-.*\.jsonl'
+ls -lt ~/.codex/shell_snapshots | sed -n '1,20p'
+```
+
+确认 `bh codex` 子进程已经打开目标会话的 rollout 文件；beacon 会优先读取这个文件，
+不会按同目录其它活跃会话猜测。`new` 后如果暂时没有新 rollout，确认最新 shell
+snapshot 里带有同一个 `CODEX_BLACKHOLE_SUPERVISOR_PID`，beacon 会据此回到最小等级。
+
 ### Claude Code hook 报 `/mnt/c/... No such file`
 
 - 重新运行 `bh claude`，它会重装 bridge。
@@ -106,6 +121,20 @@ CODEX_BLACKHOLE_CODEX_BIN=/path/to/codex bh codex
 - 如果看到文本，检查是否设置了 `CLAUDE_BLACKHOLE_SHOW_STATUSLINE=1`。
 - 重新运行 `bh claude` 以刷新 helper。
 
+### Claude `new` 后没有回到最小比例
+
+当前版本读取 transcript 前会校验 `session_id` 和 transcript 文件名是否一致。若仍继承
+旧会话大小：
+
+```bash
+cmp -s blackhole-windows-terminal/blackhole-statusline.js \
+  /mnt/c/Users/YOUR_USER/.claude/blackhole-statusline.js && echo helper-in-sync
+find /mnt/c/Users/YOUR_USER/.claude/projects -type f -name '*.jsonl' -mmin -60
+```
+
+如果 helper 不一致，重新运行 `bh claude`；它会重装 `C:\Users\YOUR_USER\.claude`
+下的 bridge 和 Node helper。
+
 ### 滚动会话后黑洞消失
 
 当前版本通过 `TOKEN_LEVEL` fallback 解决该问题。若仍消失：
@@ -115,6 +144,24 @@ node blackhole-windows-terminal/blackhole-statusline.js level-test 0.5
 ```
 
 然后检查 Windows Terminal profile 是否切到 `blackhole_winterminal_live0/1.hlsl`。
+
+### 黑洞反复变大变小
+
+通常是旧 Codex beacon 还在写全局 runtime shader。当前版本启动新模式时会自动清理
+旧 beacon，并用 `blackhole-live-owner.json` 阻止旧写入者覆盖当前窗口。
+
+手动确认：
+
+```bash
+ps -eo pid,ppid,etime,cmd | rg 'blackhole-statusline\.js codex-beacon'
+```
+
+如果仍能看到旧进程，重新运行任一模式入口即可触发清理：
+
+```bash
+bh token
+bh codex
+```
 
 ### 初始大小或移动速度不合适
 
