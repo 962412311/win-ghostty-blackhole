@@ -96,6 +96,12 @@ function currentMode(text) {
   return match[1];
 }
 
+function shaderSiblingPath(filePath, suffix) {
+  const text = String(filePath);
+  if (/\.hlsl$/i.test(text)) return text.replace(/(\.hlsl)$/i, `${suffix}$1`);
+  return `${text}${suffix}`;
+}
+
 function toWindowsPath(filePath) {
   if (process.platform === 'win32') return filePath;
   const match = String(filePath).match(/^\/mnt\/([a-zA-Z])\/(.*)$/);
@@ -173,6 +179,20 @@ function findBlackholeProfile(settings) {
   const list = settings?.profiles?.list;
   if (!Array.isArray(list)) return null;
   return list.find((profile) => profile.name === wtProfileName) || null;
+}
+
+function currentWtShaderPath() {
+  const settings = loadWtSettings();
+  const profile = settings ? findBlackholeProfile(settings) : null;
+  return profile?.['experimental.pixelShaderPath'] || '';
+}
+
+function staticModeShaderPath(mode) {
+  const name = canonicalMode(mode);
+  const slot0 = shaderSiblingPath(runtimeShader, `_${name}_live0`);
+  const slot1 = shaderSiblingPath(runtimeShader, `_${name}_live1`);
+  const current = currentWtShaderPath();
+  return current === toWindowsPath(slot0) ? slot1 : slot0;
 }
 
 function updateWtProfile(shaderPath) {
@@ -278,11 +298,16 @@ function installMode(mode, ownerLabel = mode) {
   stopStaleCodexBeacons();
   const ownerId = claimLiveOwner(ownerLabel);
   const define = modes.get(mode);
+  const text = renderShader(define, mode);
+  const activeShader = canonicalMode(mode) === 'token'
+    ? runtimeShader
+    : staticModeShaderPath(mode);
   fs.mkdirSync(path.dirname(runtimeShader), { recursive: true });
-  fs.writeFileSync(runtimeShader, renderShader(define, mode));
-  updateWtProfile(runtimeShader);
+  fs.writeFileSync(runtimeShader, text);
+  if (activeShader !== runtimeShader) fs.writeFileSync(activeShader, text);
+  updateWtProfile(activeShader);
   saveState(canonicalMode(mode));
-  return ownerId;
+  return { ownerId, shaderPath: activeShader };
 }
 
 function loadClaudeSettings() {
@@ -393,7 +418,7 @@ function windowsCwdToWsl(cwd) {
 }
 
 function openClaude(args) {
-  const ownerId = installMode('token', 'claude');
+  const { ownerId } = installMode('token', 'claude');
   installClaudeBridge(ownerId);
   const bhCmd = toWindowsPath(path.join(toolDir, 'bh.cmd'));
   const cwd = toWindowsPath(process.cwd());
@@ -447,7 +472,7 @@ if (cmd === 'open-claude') {
 }
 
 if (cmd === 'install-claude' || cmd === 'install-claude-bridge') {
-  const ownerId = installMode('token', 'claude');
+  const { ownerId } = installMode('token', 'claude');
   console.log(`Claude blackhole bridge: ${installClaudeBridge(ownerId)}`);
   console.log(toWindowsPath(runtimeShader));
   process.exit(0);
@@ -464,8 +489,8 @@ if (!modes.has(cmd)) usage(2);
 
 const mode = canonicalMode(cmd);
 const shouldOpen = process.argv.slice(3).includes('--open');
-installMode(mode, mode);
+const { shaderPath } = installMode(mode, mode);
 if (shouldOpen) openBlackholeTab(mode);
 
 console.log(`Blackhole shader mode: ${mode}`);
-console.log(toWindowsPath(runtimeShader));
+console.log(toWindowsPath(shaderPath));

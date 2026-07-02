@@ -1,7 +1,7 @@
 # 复现安装指南
 
 本文用于在另一台 Windows + WSL 电脑上复现 Windows Terminal 黑洞效果。文档日期：
-2026-07-01。
+2026-07-02。
 
 ## 目标效果
 
@@ -99,6 +99,10 @@ sha256sum -c win-ghostty-blackhole-repro-2026-07-01.sha256
 ```cmd
 set BLACKHOLE_WT_PROFILE=你的Profile名称
 ```
+
+运行 `bh demo`、`bh token`、`bh pomodoro`、`bh codex` 或 `bh claude` 后，脚本可能会把
+`experimental.pixelShaderPath` 自动切到 `blackhole_winterminal*_live0/1.hlsl`。
+这是正常行为，用于刷新 token 等级或强制 Windows Terminal 重新加载静态模式 shader。
 
 ## 安装命令入口
 

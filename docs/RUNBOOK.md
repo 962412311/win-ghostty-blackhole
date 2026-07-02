@@ -1,6 +1,6 @@
 # 运维与排障手册
 
-文档日期：2026-07-01。
+文档日期：2026-07-02。
 
 ## 基础健康检查
 
@@ -60,9 +60,14 @@ command -v sqlite3
 ```text
 blackhole_winterminal_live0.hlsl
 blackhole_winterminal_live1.hlsl
+blackhole_winterminal_demo_live0.hlsl
+blackhole_winterminal_demo_live1.hlsl
+blackhole_winterminal_pomodoro_live0.hlsl
+blackhole_winterminal_pomodoro_live1.hlsl
 ```
 
-这是正常行为，用于刷新 `TOKEN_LEVEL`。
+这是正常行为。`blackhole_winterminal_live0/1.hlsl` 用于刷新 `TOKEN_LEVEL`；
+`demo`、`pomodoro` 的 live 文件用于强制 Windows Terminal 重新加载静态模式 shader。
 
 ## 常见问题
 
@@ -211,10 +216,14 @@ node blackhole-windows-terminal/blackhole-statusline.js level-test 0.2
 
 ## 清理运行时文件
 
-可删除以下运行时生成物，之后重新运行 `bh token`、`bh codex` 或 `bh claude` 会再生成：
+可删除以下运行时生成物，之后重新运行对应 `bh` 命令会再生成：
 
 ```text
 C:\Users\YOUR_USER\terminal-shaders\blackhole_winterminal_live0.hlsl
 C:\Users\YOUR_USER\terminal-shaders\blackhole_winterminal_live1.hlsl
+C:\Users\YOUR_USER\terminal-shaders\blackhole_winterminal_demo_live0.hlsl
+C:\Users\YOUR_USER\terminal-shaders\blackhole_winterminal_demo_live1.hlsl
+C:\Users\YOUR_USER\terminal-shaders\blackhole_winterminal_pomodoro_live0.hlsl
+C:\Users\YOUR_USER\terminal-shaders\blackhole_winterminal_pomodoro_live1.hlsl
 C:\Users\YOUR_USER\terminal-shaders\blackhole-live-level.txt
 ```

@@ -1,6 +1,6 @@
 # 复现归档清单
 
-文档日期：2026-07-01。
+文档日期：2026-07-02。
 
 归档包目标：把当前可复用内容打包，便于另一台 Windows + WSL 电脑快速复现。
 
@@ -29,7 +29,7 @@ Git 仓库跟踪最新复现包：
 - `dist/`
 - `blackhole-windows-terminal/__pycache__/`
 - `*.pyc`
-- Windows Terminal 运行时生成的 `blackhole_winterminal_live0/1.hlsl`
+- Windows Terminal 运行时生成的 `blackhole_winterminal*_live0/1.hlsl`
 - Windows Terminal 运行时生成的 `blackhole-live-level.txt`
 
 ## 生成命令

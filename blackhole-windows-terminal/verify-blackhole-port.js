@@ -21,8 +21,8 @@ const MODEL_CONSTANTS = [
 
 const LOCAL_TUNING_CONSTANTS = new Map([
   ['TOKEN_AREA_MIN', '0.0030'],
-  ['TOKEN_CALM', '0.0200'],
-  ['TOKEN_RUSH', '0.5500'],
+  ['TOKEN_CALM', '0.0050'],
+  ['TOKEN_RUSH', '0.1375'],
 ]);
 
 const HLSL_ONLY_CONSTANTS = new Set([
@@ -36,8 +36,8 @@ const HLSL_ONLY_CONSTANTS = new Set([
 ]);
 
 const FORMULA_ANCHORS = [
-  ['time drift', 'iTime * DRIFT_SPEED', 'Time * DRIFT_SPEED'],
-  ['demo look gate', 'if (SIZE_MODE == MODE_DEMO) L = demoLook();', 'if (SIZE_MODE == MODE_DEMO) L = demoLook();'],
+  ['time drift', 'iTime * DRIFT_SPEED', 'demoTime * DRIFT_SPEED'],
+  ['demo look gate', 'if (SIZE_MODE == MODE_DEMO) L = demoLook();', 'if (SIZE_MODE == MODE_DEMO) L = demoLook(demoLookLvl);'],
   ['disk inner clamp', 'max(L.inner, 1.6)', 'max(L.inner, 1.6)'],
   ['disk outer clamp', 'max(L.outer, rin + 0.5)', 'max(L.outer, rin + 0.5)'],
   ['pomodoro work seconds', 'WORK_PERIOD_MIN * 60.0', 'WORK_PERIOD_MIN * 60.0'],
@@ -52,7 +52,7 @@ const FORMULA_ANCHORS = [
   ['pomodoro extent', '(rout / B_CRIT) * HOLE_RADIUS * sz', '(rout / B_CRIT) * HOLE_RADIUS * sz'],
   ['pomodoro y low', 'WORK_AREA + 0.12 + ext', 'WORK_AREA + 0.12 + ext'],
   ['pomodoro speed', 'mix(0.35, 1.0, I)', 'lerp(0.35, 1.0, I)'],
-  ['token level demo', 'min(mod(iTime, DEMO_SEC) / DEMO_GROW_SEC, 1.0)', 'min(fmod(Time, DEMO_SEC) / DEMO_GROW_SEC, 1.0)'],
+  ['demo level host smoothing', 'min(mod(iTime, DEMO_SEC) / DEMO_GROW_SEC, 1.0)', 'min(u / DEMO_GROW_SEC, 1.0)'],
   ['token ease', 'pow(clamp(lvl, 0.0, 1.0), TOKEN_EASE)', 'pow(clamp(lvl, 0.0, 1.0), TOKEN_EASE)'],
   ['token intensity', 'mix(0.10, 1.0, g)', 'lerp(0.10, 1.0, g)'],
   ['token rh min', 'sqrt(TOKEN_AREA_MIN * aspect / 3.1415927)', 'sqrt(TOKEN_AREA_MIN * aspect / 3.1415927)'],
@@ -97,6 +97,12 @@ const HOST_ADAPTATION_ANCHORS = [
   ['ghostty screen uv source', 'fragCoord / res', null],
   ['windows terminal screen uv source', null, 'float2 uv = pos.xy / res;'],
   ['windows terminal passthrough sampling', null, 'shaderTexture.Sample(samplerState, tex)'],
+  ['windows terminal demo closed level', null, 'float reset = 1.0 - smoothstep(DEMO_GROW_SEC, DEMO_SEC, u);'],
+  ['windows terminal demo look holds on reset', null, 'float demoLookLvl = (SIZE_MODE == MODE_DEMO) ? demoLookLevel() : -1.0;'],
+  ['windows terminal demo look follows size', null, 'DiskLook demoLook(float lvl)'],
+  ['windows terminal demo animation holds on reset', null, 'float demoTime = (SIZE_MODE == MODE_DEMO) ? demoAnimTime() : Time;'],
+  ['windows terminal demo phase closes before reset', null, 'return demoForwardLevel() * 6.2831853;'],
+  ['windows terminal demo closed wander', null, 'float2 demoLoopWander()'],
   ['ghostty pomodoro wall clock', 'float wall     = iDate.w + iTime * (TIME_SCALE - 1.0);', null],
   ['windows terminal pomodoro wall offset', null, 'float wall = POMODORO_WALL_OFFSET + Time * TIME_SCALE;'],
   ['ghostty pomodoro cursor idle', 'float idle = max(0.0, iTime - iTimeCursorChange);', null],

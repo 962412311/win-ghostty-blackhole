@@ -58,8 +58,8 @@ static const float TOKEN_HOME_X  = 0.9600;
 static const float TOKEN_HOME_Y  = 0.0400;
 static const float TOKEN_EASE    = 1.0000;
 static const float TOKEN_REACH   = 1.0000;
-static const float TOKEN_CALM    = 0.0200;
-static const float TOKEN_RUSH    = 0.5500;
+static const float TOKEN_CALM    = 0.0050;
+static const float TOKEN_RUSH    = 0.1375;
 
 static const float DEMO_SEC      = 42.0000;
 static const float DEMO_GROW_SEC = 40.0000;
@@ -150,13 +150,48 @@ DiskLook mixLook(DiskLook a, DiskLook b, float f)
         lerp(a.expo,  b.expo,  f), lerp(a.star,  b.star,  f));
 }
 
-DiskLook demoLook()
+DiskLook demoLook(float lvl)
 {
-    float u = fmod(Time, DEMO_SEC) / DEMO_SEC * float(DEMO_N);
-    int i = int(min(u, float(DEMO_N) - 0.001));
-    float f = smoothstep(1.0 - DEMO_XFADE, 1.0, frac(u));
-    int next = (i + 1) - ((i + 1) / DEMO_N) * DEMO_N;
-    return mixLook(demoTour(i), demoTour(next), f);
+    float u = clamp(lvl, 0.0, 1.0) * (float(DEMO_N) - 1.0);
+    int i = int(min(u, float(DEMO_N) - 1.001));
+    float f = smoothstep(1.0 - DEMO_XFADE, 1.0, u - float(i));
+    return mixLook(demoTour(i), demoTour(i + 1), f);
+}
+
+float demoForwardLevel()
+{
+    float u = fmod(Time, DEMO_SEC);
+    return min(u / DEMO_GROW_SEC, 1.0);
+}
+
+float demoPhase()
+{
+    return demoForwardLevel() * 6.2831853;
+}
+
+float demoLevel()
+{
+    float u = fmod(Time, DEMO_SEC);
+    float grow = demoForwardLevel();
+    float reset = 1.0 - smoothstep(DEMO_GROW_SEC, DEMO_SEC, u);
+    return grow * reset;
+}
+
+float demoLookLevel()
+{
+    return demoForwardLevel();
+}
+
+float demoAnimTime()
+{
+    return demoForwardLevel() * DEMO_GROW_SEC;
+}
+
+float2 demoLoopWander()
+{
+    float a = demoPhase();
+    return float2(0.75 * sin(a) + 0.25 * sin(2.0 * a + 1.0),
+                  0.70 * sin(a + 2.1) + 0.30 * sin(3.0 * a));
 }
 
 // ------------------------------------------------------------------- noise --
@@ -332,10 +367,13 @@ float4 main(float4 pos : SV_POSITION, float2 tex : TEXCOORD) : SV_TARGET
 #endif
 
     float yUp = 1.0 - uv.y;
-    float t = Time * DRIFT_SPEED;
+    float demoTime = (SIZE_MODE == MODE_DEMO) ? demoAnimTime() : Time;
+    float t = demoTime * DRIFT_SPEED;
 
+    float demoLvl = (SIZE_MODE == MODE_DEMO) ? demoLevel() : -1.0;
+    float demoLookLvl = (SIZE_MODE == MODE_DEMO) ? demoLookLevel() : -1.0;
     DiskLook L = lookDefault();
-    if (SIZE_MODE == MODE_DEMO) L = demoLook();
+    if (SIZE_MODE == MODE_DEMO) L = demoLook(demoLookLvl);
 
     float rin = max(L.inner, 1.6);
     float rout = max(L.outer, rin + 0.5);
@@ -374,7 +412,7 @@ float4 main(float4 pos : SV_POSITION, float2 tex : TEXCOORD) : SV_TARGET
         if (SIZE_MODE != MODE_DEMO && TOKEN_LEVEL < 0.0)
             live = tokenLevel(uv, tex, texPerUvX, texPerUvY);
         float lvl = (SIZE_MODE == MODE_DEMO)
-                  ? min(fmod(Time, DEMO_SEC) / DEMO_GROW_SEC, 1.0)
+                  ? demoLvl
                   : (TOKEN_LEVEL >= 0.0 ? TOKEN_LEVEL : live);
         if (lvl < 0.0)
             return float4(shaderTexture.Sample(samplerState, tex).rgb, 1.0);
@@ -400,8 +438,15 @@ float4 main(float4 pos : SV_POSITION, float2 tex : TEXCOORD) : SV_TARGET
                             max(room * 0.35, float2(0.006, 0.006)));
         float2 ampEff = max(room - wobAmp, float2(0.0, 0.0));
         float2 wander = lerp(lissa(t * TOKEN_CALM), lissa(t * TOKEN_RUSH), g);
+        float2 wobble = float2(cos(t * 0.8), sin(t * 1.0));
+        if (SIZE_MODE == MODE_DEMO)
+        {
+            float a = demoPhase();
+            wander = demoLoopWander();
+            wobble = float2(cos(a), sin(a));
+        }
         center = (lo + hi) * 0.5 + wander * ampEff
-               + wobAmp * float2(cos(t * 0.8), sin(t * 1.0));
+               + wobAmp * wobble;
     }
 
     float vis = smoothstep(0.0, 0.10, I);

@@ -7,7 +7,7 @@
 - [docs/INSTALL_REPRODUCE.md](docs/INSTALL_REPRODUCE.md)：另一台电脑的复现安装步骤。
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)：运行机制、数据通道和设计取舍。
 - [docs/RUNBOOK.md](docs/RUNBOOK.md)：验证命令、排障和环境变量。
-- [docs/HANDOFF.md](docs/HANDOFF.md)：2026-07-01 会话完成项和遗留状态。
+- [docs/HANDOFF.md](docs/HANDOFF.md)：阶段完成项和遗留状态。
 
 ## 维护边界
 
@@ -19,6 +19,10 @@
   影响安装、脚本、shader 或文档时，重新运行 `bash scripts/package-repro.sh` 并提交新包。
 - `blackhole-live-owner.json` 用于限制当前 runtime shader 写入者；不要移除 owner
   检查，否则旧 Codex/Claude 写入者会互相覆盖导致闪烁。
+- `demo`、`pomodoro` 等静态模式通过 `blackhole_winterminal_<mode>_live0/1.hlsl`
+  交替切换 Windows Terminal profile 路径，避免同一路径 shader 编译缓存残留。
+- Demo 回落阶段只缩小尺寸，形态参数、路径相位和吸积盘内部动画时间都保持末态；
+  修改 demo 时间/形态映射时必须同步 verifier 锚点。
 - Windows 本地视觉调优只允许集中在 `TOKEN_AREA_MIN`、`TOKEN_CALM`、`TOKEN_RUSH`
   等明确列入 verifier 的 local tuning 常量中。
 - `MODE_POMODORO` 在 Windows Terminal 中用 `POMODORO_WALL_OFFSET` 补偿缺失的
