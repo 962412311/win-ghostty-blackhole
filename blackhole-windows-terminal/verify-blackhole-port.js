@@ -23,6 +23,7 @@ const LOCAL_TUNING_CONSTANTS = new Map([
   ['TOKEN_AREA_MIN', '0.0030'],
   ['TOKEN_CALM', '0.0050'],
   ['TOKEN_RUSH', '0.1375'],
+  ['DEMO_LEVEL_FLOOR', '0.0350'],
 ]);
 
 const HLSL_ONLY_CONSTANTS = new Set([
@@ -102,6 +103,7 @@ const HOST_ADAPTATION_ANCHORS = [
   ['windows terminal demo look follows size', null, 'DiskLook demoLook(float lvl)'],
   ['windows terminal demo animation holds on reset', null, 'float demoTime = (SIZE_MODE == MODE_DEMO) ? demoAnimTime() : Time;'],
   ['windows terminal demo phase closes before reset', null, 'return demoForwardLevel() * 6.2831853;'],
+  ['windows terminal demo never reaches invisible zero', null, 'return max(grow * reset, DEMO_LEVEL_FLOOR);'],
   ['windows terminal demo closed wander', null, 'float2 demoLoopWander()'],
   ['ghostty pomodoro wall clock', 'float wall     = iDate.w + iTime * (TIME_SCALE - 1.0);', null],
   ['windows terminal pomodoro wall offset', null, 'float wall = POMODORO_WALL_OFFSET + Time * TIME_SCALE;'],

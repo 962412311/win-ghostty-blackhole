@@ -89,6 +89,8 @@ WSL：
 - 确认 Windows Terminal profile 名称是 `Blackhole`，或设置 `BLACKHOLE_WT_PROFILE`。
 - 运行 `bh mode`，确认输出路径是 Windows 侧 `terminal-shaders`。
 - 重新打开一个 `Blackhole` 标签页。
+- 如果长时间运行后停在不可见状态，确认 HLSL 中 `DEMO_LEVEL_FLOOR` 仍为非零值，
+  并重新运行 `bh demo` 强制刷新静态模式 shader。
 
 ### 快速验证番茄钟模式
 
@@ -205,6 +207,7 @@ bh codex
 - `TOKEN_AREA_MIN`：初始大小。
 - `TOKEN_CALM`：低上下文移动速度。
 - `TOKEN_RUSH`：高上下文移动速度。
+- `DEMO_LEVEL_FLOOR`：demo 回落时的最小可见等级。
 
 改完运行：
 

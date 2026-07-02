@@ -64,6 +64,7 @@ static const float TOKEN_RUSH    = 0.1375;
 static const float DEMO_SEC      = 42.0000;
 static const float DEMO_GROW_SEC = 40.0000;
 static const float DEMO_XFADE    = 0.1800;
+static const float DEMO_LEVEL_FLOOR = 0.0350;
 static const int DEMO_N = 8;
 
 static const float TOKEN_GLIDE_MIN  = 0.3000;
@@ -174,7 +175,7 @@ float demoLevel()
     float u = fmod(Time, DEMO_SEC);
     float grow = demoForwardLevel();
     float reset = 1.0 - smoothstep(DEMO_GROW_SEC, DEMO_SEC, u);
-    return grow * reset;
+    return max(grow * reset, DEMO_LEVEL_FLOOR);
 }
 
 float demoLookLevel()

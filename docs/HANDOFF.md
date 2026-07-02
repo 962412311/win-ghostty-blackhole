@@ -23,11 +23,12 @@
   抢同一个 runtime shader 导致黑洞反复变大变小。
 - `demo`、`pomodoro` 等静态模式会交替写入 `blackhole_winterminal_<mode>_live0/1.hlsl`
   并切换 Windows Terminal profile，避免同一路径 shader 编译缓存导致旧效果残留。
-- Demo 回落阶段只缩小尺寸，形态参数、路径相位和吸积盘内部动画时间都保持末态。
+- Demo 回落阶段只缩小到 `DEMO_LEVEL_FLOOR`，形态参数、路径相位和吸积盘内部动画时间都保持末态。
 - 初始黑洞调小，移动速度调慢：
   - `TOKEN_AREA_MIN = 0.0030`
   - `TOKEN_CALM = 0.0050`
   - `TOKEN_RUSH = 0.1375`
+  - `DEMO_LEVEL_FLOOR = 0.0350`
 - WSL 和 Windows 入口已改为按脚本所在目录自定位，适合打包迁移。
 - 最新复现归档跟踪在 `dist/win-ghostty-blackhole-repro-2026-07-01.*`，包含
   `ghostty-blackhole-src/`，可在新电脑离线运行严格 shader 校验。
@@ -57,7 +58,7 @@ node blackhole-windows-terminal/verify-blackhole-port.js
 `verify-blackhole-port.js` 的通过输出应包含：
 
 ```text
-OK: 42 model constants, 3 local tuning constants, 55 formula anchors, and 13 host-adaptation anchors verified.
+OK: 42 model constants, 4 local tuning constants, 55 formula anchors, and 14 host-adaptation anchors verified.
 ```
 
 ## 注意事项

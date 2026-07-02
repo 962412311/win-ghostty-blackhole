@@ -68,8 +68,9 @@ node blackhole-windows-terminal\blackhole-statusline.js level-test 0.5
 - `TOKEN_AREA_MAX`：最大显示比例。
 - `TOKEN_EASE`：上下文等级到尺寸的曲线，`1.0` 为线性。
 - `TOKEN_CALM` / `TOKEN_RUSH`：低/高上下文等级下的移动速度。
+- `DEMO_LEVEL_FLOOR`：demo 循环回落时的最小等级，避免长时间运行后卡在不可见状态。
 
-改完后重新运行 `bh token`、`bh pomodoro`、`bh codex` 或 `bh claude` 让运行时
+改完后重新运行 `bh demo`、`bh token`、`bh pomodoro`、`bh codex` 或 `bh claude` 让运行时
 shader 生效。
 
 ## 验证

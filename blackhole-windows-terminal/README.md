@@ -138,10 +138,13 @@ shader 自身的尺寸常量在 `blackhole_winterminal.hlsl`：
 - `TOKEN_EASE`：等级到尺寸的曲线；`1.0` 是线性。
 - `TOKEN_CALM`：低上下文等级时的移动速度；本地默认 `0.0050`。
 - `TOKEN_RUSH`：高上下文等级时的移动速度；本地默认 `0.1375`。
+- `DEMO_LEVEL_FLOOR`：demo 回落时的最小等级；本地默认 `0.0350`，避免长时间
+  运行后停在不可见状态。
 
-改 HLSL 后需要重新运行 `bh token`、`bh codex` 或 `bh claude` 让运行时 shader
+改 HLSL 后需要重新运行 `bh demo`、`bh token`、`bh codex` 或 `bh claude` 让运行时 shader
 生效。`verify-blackhole-port.js` 仍严格校验原版公式和主体常量，但允许
-`TOKEN_AREA_MIN`、`TOKEN_CALM`、`TOKEN_RUSH` 作为 Windows 本地视觉调优常量偏离上游。
+`TOKEN_AREA_MIN`、`TOKEN_CALM`、`TOKEN_RUSH`、`DEMO_LEVEL_FLOOR`
+作为 Windows 本地视觉调优常量偏离上游。
 
 当前协议使用近黑色编码：
 

@@ -22,9 +22,10 @@
 - `demo`、`pomodoro` 等静态模式通过 `blackhole_winterminal_<mode>_live0/1.hlsl`
   交替切换 Windows Terminal profile 路径，避免同一路径 shader 编译缓存残留。
 - Demo 回落阶段只缩小尺寸，形态参数、路径相位和吸积盘内部动画时间都保持末态；
-  修改 demo 时间/形态映射时必须同步 verifier 锚点。
-- Windows 本地视觉调优只允许集中在 `TOKEN_AREA_MIN`、`TOKEN_CALM`、`TOKEN_RUSH`
-  等明确列入 verifier 的 local tuning 常量中。
+  `DEMO_LEVEL_FLOOR` 用于避免长时间运行后停在不可见低点。修改 demo 时间/形态映射时
+  必须同步 verifier 锚点。
+- Windows 本地视觉调优只允许集中在 `TOKEN_AREA_MIN`、`TOKEN_CALM`、`TOKEN_RUSH`、
+  `DEMO_LEVEL_FLOOR` 等明确列入 verifier 的 local tuning 常量中。
 - `MODE_POMODORO` 在 Windows Terminal 中用 `POMODORO_WALL_OFFSET` 补偿缺失的
   `iDate.w`；Windows Terminal 没有 Ghostty 的 `iTimeCursorChange`，空闲检测固定为未空闲。
 - Windows Terminal 真实视觉验证以用户肉眼确认为准；不要默认依赖截图自动判断。

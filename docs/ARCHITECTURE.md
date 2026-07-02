@@ -132,10 +132,12 @@ Claude 读取 `context_window`、消息 usage 或 transcript usage。读取 tran
 - `TOKEN_AREA_MIN = 0.0030`：初始黑洞更小。
 - `TOKEN_CALM = 0.0050`：低上下文等级移动更慢。
 - `TOKEN_RUSH = 0.1375`：高上下文等级移动更慢。
+- `DEMO_LEVEL_FLOOR = 0.0350`：demo 回落时保留最小可见等级，避免 Windows
+  Terminal 长时间运行后若停在 reset 低点导致黑洞不可见。
 
 Demo 模式不使用这组 token 速度缩放；它保留独立演示节奏，但 HLSL 侧额外让 demo
 等级和 wander 在 42 秒边界闭合，避免循环边界突变。Demo 的黑洞形态、路径相位和
 吸积盘内部动画时间都绑定到同一个 demo 前进进度，避免形态只按时间变化而与大小脱节；
-回落阶段只缩小尺寸，其余形态保持末次状态，避免回落时快速倒放形态。
+回落阶段只缩小到 `DEMO_LEVEL_FLOOR`，其余形态保持末次状态，避免回落时快速倒放形态。
 
 `verify-blackhole-port.js` 仍校验主体公式和其他模型常量。
