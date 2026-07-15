@@ -62,15 +62,15 @@ return mixLook(tokenTour(i), tokenTour(i + 1), f);
 路径混合继续读取同一个弹簧等级 `g`。形态参数在区间边界保持数值连续；不同字段允许按
 上游预设呈现非单调变化，这是遍历全部原版形态的预期结果。
 
-弹簧回弹时 `g` 会短暂反向，因此形态也会沿同一路径短暂回弹，不允许形态单独跳到
-另一个时间相位。
+默认弹簧采用临界阻尼，`g` 单调逼近目标，不反向、不超调；形态沿同一个 `g` 连续
+变化，不允许形态单独跳到另一个时间相位。
 
-## 慢速弹簧
+## 最终平滑曲线
 
 Codex 专用弹簧默认参数整体放慢 2 倍：
 
 ```text
-CODEX_BLACKHOLE_SPRING_BOUNCE  = 0.5   （不变）
+CODEX_BLACKHOLE_SPRING_BOUNCE  = 0.0   （临界阻尼，0 回弹）
 CODEX_BLACKHOLE_SPRING_MIN_SEC = 1.6   （原 0.8）
 CODEX_BLACKHOLE_SPRING_MAX_SEC = 6.0   （原 3.0）
 CODEX_BLACKHOLE_SPRING_RATE    = 8.0   （原 4.0）
@@ -82,15 +82,23 @@ CODEX_BLACKHOLE_SPRING_RATE    = 8.0   （原 4.0）
 clamp(abs(target - position) * 8.0, 1.6, 6.0)
 ```
 
-解析式阻尼、`epsilon=0.001`、位置和速度继承、目标重合但速度未归零时继续最短弹簧阶段
-等行为不变。只改变时间尺度，不改变约 16% 的首次超调比例。
+解析式临界阻尼仍使用 `epsilon=0.001`，并与短尾矢量曲线混合。默认
+`CODEX_BLACKHOLE_SPRING_TIME_WARP=5.0`、
+`CODEX_BLACKHOLE_SPRING_VECTOR_BLEND=0.55`，提高前段加速感并缩短接近目标时的拖尾；
+混合曲线保持单调、0 回弹、无超调。retarget 继续继承位置和速度。
 
 手动 `bh token` 和 Claude 使用的 `BLACKHOLE_TOKEN_GLIDE_*` 参数保持原值。
 
 ## 数据通道与兼容边界
 
-- `codex-beacon` 仍每 500ms 采样上下文、每 10ms 计算过渡帧、每 50ms 刷新稳态 marker。
-- marker 仍是当前标签页顶部安全区的一个近黑色单格。
+- `codex-beacon` 仍每 500ms 采样上下文；过渡与稳态都每 10ms 向 supervisor 发送
+  marker 数据。稳态沿用 8-bit 等级、5-bit 移动权重和旧校验；大小阶段使用 11-bit
+  等级、固定 magic 和反向校验，兼容已经运行的旧 beacon。
+- 上下文目标变化时先用 480ms smootherstep 淡出闭环移动，再执行大小/形态弹簧；
+  弹簧结束后才用 2400ms 淡入移动。
+- supervisor 通过 `script(1)` PTY 串行转发 Codex 输出；控制序列完整时允许 marker
+  刷新进入同步帧，在 `CSI ?2026l` 提交前写入，并在安全输出块后补写。写格使用不推进
+  光标的 `ECH`。
 - 不重载 shader，不启动 Codex `level-glider`，不触碰底部输入行。
 - `TOKEN_LOOP_SEC=240`、整数 turns、`DRIFT_SPEED` 和 demo 时间保持不变。
 - 所有 `demoTour()` 参数继续使用上游原值，不新增或放大形态参数。
@@ -100,18 +108,20 @@ clamp(abs(target - position) * 8.0, 1.6, 6.0)
 
 自动验证必须覆盖：
 
-1. Codex 默认弹簧参数为 `0.5 / 1.6 / 6.0 / 8.0`。
-2. 大跨度 6 秒结束前的位置和速度误差小于 marker 的 `1/250` 分辨率。
-3. 回弹峰值比例与原 3 秒弹簧一致，证明只改变时间尺度。
-4. retarget 继续继承 position 和 velocity；目标重合但速度非零时不会立即停止。
+1. Codex 默认弹簧参数为 `0.0 / 1.6 / 6.0 / 8.0`。
+2. 大跨度 6 秒结束前的位置和速度误差小于高精度 marker 的 `1/2047` 分辨率。
+3. 临界阻尼样本单调逼近目标，不反向、不超调。
+4. 高速向上、向下 retarget 到近目标时仍继承 position 和 velocity，所有采样值均位于
+   起点和目标之间；目标重合但速度非零时不会立即停止。
 5. `tokenTour()` 顺序严格为 `1, 2, 3, 4, 5, 6, 0`。
 6. `g = 0, 1/6, 2/6, ..., 1` 分别命中上述原版形态，区间两侧数值连续。
 7. `tokenLook()` 不读取 `Time`，全部 14 个字段仍通过 `mixLook()` 插值。
-8. Node/bash 语法、公式 verifier、DXC、`git diff --check` 和复现包校验通过。
+8. 新旧 marker 的等级/移动权重编解码、三段互斥状态锚点和同步帧内安全刷新通过。
+9. Node/bash 语法、公式 verifier、DXC、`git diff --check` 和复现包校验通过。
 
 真实 Windows Terminal 由用户确认：
 
 - 上下文变化时可清楚看到完整形态序列随大小共同变化；
 - 大跨度变化约 6 秒稳定，速度明显为上一版的一半；
 - 形态没有跳变、独立快进或与大小脱节；
-- 回弹、输入、滚动、缩放和关闭行为正常。
+- 过渡无回弹、无末帧吸附，输入、滚动、缩放和关闭行为正常。

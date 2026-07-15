@@ -12,6 +12,14 @@ tar -C "$repo" \
   --exclude='./ghostty-blackhole-src/.git' \
   --exclude='./dist' \
   --exclude='./blackhole-windows-terminal/__pycache__' \
+  --exclude='./blackhole-windows-terminal/blackhole_winterminal*_live[01].hlsl' \
+  --exclude='./blackhole-windows-terminal/blackhole-live-level.txt' \
+  --exclude='./blackhole-windows-terminal/blackhole-live-owner.json' \
+  --exclude='./blackhole-windows-terminal/blackhole-level-target.json' \
+  --exclude='./blackhole-windows-terminal/blackhole-level-current.json' \
+  --exclude='./blackhole-windows-terminal/blackhole-level-glider.json' \
+  --exclude='./blackhole-windows-terminal/blackhole-level-glider.lock' \
+  --exclude='./blackhole-windows-terminal/blackhole-level-command.txt' \
   --exclude='*.pyc' \
   -czf "$out_dir/$name.tar.gz" \
   .

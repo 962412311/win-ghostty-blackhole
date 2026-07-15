@@ -67,8 +67,21 @@ node blackhole-windows-terminal\blackhole-statusline.js level-test 0.5
 - `TOKEN_AREA_MIN`：初始/最小显示比例。
 - `TOKEN_AREA_MAX`：最大显示比例。
 - `TOKEN_EASE`：上下文等级到尺寸的曲线，`1.0` 为线性。
-- `TOKEN_CALM` / `TOKEN_RUSH`：低/高上下文等级下的移动速度。
+- `TOKEN_LOOP_SEC`：token 移动路径的闭环周期，默认 `240` 秒；中心位移速度为上一版的 2 倍。
+- `TOKEN_CALM_TURNS` / `TOKEN_RUSH_TURNS`：低/高上下文等级在一个周期内的整数圈数。
+- `TOKEN_WOBBLE_X_TURNS` / `TOKEN_WOBBLE_Y_TURNS`：微幅移动的闭环圈数，默认
+  `15` / `19`，与主路径一起在 240 秒周期首尾闭合。
+- `DEMO_XFADE`：demo 形态插值宽度，值越大形态转换越慢。
 - `DEMO_LEVEL_FLOOR`：demo 循环回落时的最小等级，避免长时间运行后卡在不可见状态。
+
+`bh codex` 由单一 beacon 采样上下文，并在当前标签页顶部安全区写入一个近黑色标记格。
+目标变化采用 0 回弹、无超调的阻尼曲线，大跳变最长约 6 秒；尺寸阶段把单格 marker
+切换为 11-bit 高精度等级，默认每 `10ms` 更新，后段不会因量化精度下降而卡顿。闭环
+移动先用 `480ms` 平滑淡出，大小和形态独占完成过渡后再用 `2400ms` 缓慢恢复，避免
+结束时快速追赶路径。supervisor 通过 WSL PTY 在 Codex 同步绘制帧提交前后恢复 marker，
+滚动时仍保持当前等级。该过程不重载 shader，也不触碰底部输入行。HLSL 固定采样该
+标记，大小、全部形态参数、活动范围和路径混合使用同一连续值；形态按上游
+`demoTour(1) -> 2 -> 3 -> 4 -> 5 -> 6 -> 0` 依次平滑贯穿全部 7 个唯一可见预设。
 
 改完后重新运行 `bh demo`、`bh token`、`bh pomodoro`、`bh codex` 或 `bh claude` 让运行时
 shader 生效。

@@ -24,6 +24,11 @@ cbuffer PixelShaderSettings
 #define DEBUG_PASSTHROUGH 0
 #define DEBUG_TOKEN_SAMPLE_POINT 0
 #define TOKEN_LEVEL -1
+#define TOKEN_LEVEL_FROM -1
+#define TOKEN_LEVEL_TARGET -1
+#define TOKEN_GLIDE_START 0.0000
+#define TOKEN_GLIDE_DURATION 0.0000
+#define TOKEN_MOTION_TIME_OFFSET 0.0000
 
 #if DEBUG_PASSTHROUGH
 float4 main(float4 pos : SV_POSITION, float2 tex : TEXCOORD) : SV_TARGET
@@ -58,12 +63,15 @@ static const float TOKEN_HOME_X  = 0.9600;
 static const float TOKEN_HOME_Y  = 0.0400;
 static const float TOKEN_EASE    = 1.0000;
 static const float TOKEN_REACH   = 1.0000;
-static const float TOKEN_CALM    = 0.0050;
-static const float TOKEN_RUSH    = 0.1375;
+static const float TOKEN_LOOP_SEC = 240.0000;
+static const float TOKEN_CALM_TURNS = 1.0000;
+static const float TOKEN_RUSH_TURNS = 4.0000;
+static const float TOKEN_WOBBLE_X_TURNS = 15.0000;
+static const float TOKEN_WOBBLE_Y_TURNS = 19.0000;
 
 static const float DEMO_SEC      = 42.0000;
 static const float DEMO_GROW_SEC = 40.0000;
-static const float DEMO_XFADE    = 0.1800;
+static const float DEMO_XFADE    = 0.7200;
 static const float DEMO_LEVEL_FLOOR = 0.0350;
 static const int DEMO_N = 8;
 
@@ -159,6 +167,25 @@ DiskLook demoLook(float lvl)
     return mixLook(demoTour(i), demoTour(i + 1), f);
 }
 
+DiskLook tokenTour(int i)
+{
+    if (i == 0) return demoTour(1);
+    if (i == 1) return demoTour(2);
+    if (i == 2) return demoTour(3);
+    if (i == 3) return demoTour(4);
+    if (i == 4) return demoTour(5);
+    if (i == 5) return demoTour(6);
+    return demoTour(0);
+}
+
+DiskLook tokenLook(float lvl)
+{
+    float u = clamp(lvl, 0.0, 1.0) * 6.0;
+    int i = int(min(u, 5.999));
+    float f = u - float(i);
+    return mixLook(tokenTour(i), tokenTour(i + 1), f);
+}
+
 float demoForwardLevel()
 {
     float u = fmod(Time, DEMO_SEC);
@@ -195,6 +222,24 @@ float2 demoLoopWander()
                   0.70 * sin(a + 2.1) + 0.30 * sin(3.0 * a));
 }
 
+float tokenLoopPhase()
+{
+    float seconds = fmod(TOKEN_MOTION_TIME_OFFSET + Time, TOKEN_LOOP_SEC);
+    return seconds / TOKEN_LOOP_SEC * 6.2831853;
+}
+
+float2 tokenLoopWander(float a)
+{
+    return float2(0.75 * sin(a) + 0.25 * sin(2.0 * a + 1.0),
+                  0.70 * sin(a + 2.1) + 0.30 * sin(3.0 * a));
+}
+
+float2 tokenLoopWobble(float a)
+{
+    return float2(cos(a * TOKEN_WOBBLE_X_TURNS),
+                  sin(a * TOKEN_WOBBLE_Y_TURNS));
+}
+
 // ------------------------------------------------------------------- noise --
 float hash21(float2 p)
 {
@@ -226,12 +271,6 @@ float2 rot(float2 v, float a)
     float c = cos(a);
     float s = sin(a);
     return float2(c * v.x - s * v.y, s * v.x + c * v.y);
-}
-
-float2 lissa(float t)
-{
-    return float2(0.75 * sin(t * 0.37) + 0.25 * sin(t * 0.83 + 1.0),
-                  0.70 * sin(t * 0.54 + 2.1) + 0.30 * sin(t * 1.07));
 }
 
 float3 blackbody(float T)
@@ -276,7 +315,7 @@ float3 sampleTerminal(float2 targetUv, float2 pixelUv, float2 pixelTex,
         screenToTex(targetUv, pixelUv, pixelTex, texPerUvX, texPerUvY)).rgb;
 }
 
-float tokenFromRgb(float3 c)
+int tokenByteFromRgb(float3 c)
 {
     int3 v = int3(floor(saturate(c) * 255.0 + 0.5));
     int3 hi = v / 16;
@@ -284,15 +323,28 @@ float tokenFromRgb(float3 c)
 
     if (hi.x == 0x0 && hi.y == 0x0 && hi.z == 0x0)
     {
-        if (lo.x != (lo.y ^ lo.z ^ 0x5)) return -1.0;
+        if (lo.x != (lo.y ^ lo.z ^ 0x5)) return -1;
         int hiddenFill = lo.y * 16 + lo.z;
-        return hiddenFill > 250 ? -1.0 : float(hiddenFill) / 250.0;
+        return hiddenFill > 250 ? -1 : hiddenFill;
     }
 
-    if (hi.x != 0xF || hi.y != 0xB || hi.z != 0x0) return -1.0;
-    if (lo.x != (lo.y ^ lo.z ^ 0x5)) return -1.0;
+    if (hi.x == 0x1 && hi.y == 0x1 && hi.z == 0x1)
+    {
+        if (lo.x != (lo.y ^ lo.z ^ 0x5)) return -1;
+        int hiddenFill = lo.y * 16 + lo.z;
+        return hiddenFill > 250 ? -1 : hiddenFill;
+    }
+
+    if (hi.x != 0xF || hi.y != 0xB || hi.z != 0x0) return -1;
+    if (lo.x != (lo.y ^ lo.z ^ 0x5)) return -1;
     int fill = lo.y * 16 + lo.z;
-    return fill > 250 ? -1.0 : float(fill) / 250.0;
+    return fill > 250 ? -1 : fill;
+}
+
+float tokenFromRgb(float3 c)
+{
+    int fill = tokenByteFromRgb(c);
+    return fill < 0 ? -1.0 : float(fill) / 250.0;
 }
 
 float tokenDecode(float3 c)
@@ -304,6 +356,48 @@ float tokenDecode(float3 c)
                     1.055 * pow(max(c, 1e-6), float3(1.0 / 2.4, 1.0 / 2.4, 1.0 / 2.4)) - 0.055,
                     step(float3(0.0031308, 0.0031308, 0.0031308), c));
     return tokenFromRgb(s);
+}
+
+int codexMarkerChecksum(int fill, int motion)
+{
+    return (fill ^ (fill >> 4) ^ motion ^ 0x1) & 0x1;
+}
+
+float2 codexMarkerFromRgb(float3 c)
+{
+    int3 v = int3(floor(saturate(c) * 255.0 + 0.5));
+    if (v.x >= 16 && v.x <= 31 && v.y >= 0 && v.y <= 31 && v.z >= 0 && v.z <= 31)
+    {
+        int packed = (v.x << 10) | (v.y << 5) | v.z;
+        int payload = packed & 0x1FFF;
+        int fill = packed & 0xFF;
+        int motion = (packed >> 8) & 0x1F;
+        int checksum = (packed >> 13) & 0x1;
+        if (fill <= 250 && checksum == codexMarkerChecksum(fill, motion))
+            return float2(float(fill) / 250.0, float(motion) / 31.0);
+
+        int highPrecisionMagic = (payload >> 11) & 0x3;
+        if (highPrecisionMagic == 0x2 && checksum != codexMarkerChecksum(fill, motion))
+        {
+            int precise = payload & 0x7FF;
+            return float2(float(precise) / 2047.0, 0.0);
+        }
+    }
+
+    int legacyFill = tokenByteFromRgb(c);
+    return legacyFill < 0 ? float2(-1.0, 1.0)
+                          : float2(float(legacyFill) / 250.0, 1.0);
+}
+
+float2 codexMarkerDecode(float3 c)
+{
+    float2 data = codexMarkerFromRgb(c);
+    if (data.x >= 0.0) return data;
+
+    float3 s = lerp(c * 12.92,
+                    1.055 * pow(max(c, 1e-6), float3(1.0 / 2.4, 1.0 / 2.4, 1.0 / 2.4)) - 0.055,
+                    step(float3(0.0031308, 0.0031308, 0.0031308), c));
+    return codexMarkerFromRgb(s);
 }
 
 float screenTokenAt(float2 base, float yDir, float2 pixelUv, float2 pixelTex,
@@ -341,11 +435,37 @@ float screenTokenAt(float2 base, float yDir, float2 pixelUv, float2 pixelTex,
     return -1.0;
 }
 
+float smootherstep01(float x)
+{
+    float t = clamp(x, 0.0, 1.0);
+    return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+}
+
 float tokenLevel(float2 pixelUv, float2 pixelTex, float2 texPerUvX, float2 texPerUvY)
 {
     float bottom = screenTokenAt(TOKEN_DATA_UV_BOTTOM, -1.0, pixelUv, pixelTex, texPerUvX, texPerUvY);
     if (bottom >= 0.0) return bottom;
     return screenTokenAt(TOKEN_DATA_UV_TOP, 1.0, pixelUv, pixelTex, texPerUvX, texPerUvY);
+}
+
+float2 tokenCodexMarkerData(float2 pixelUv, float2 pixelTex,
+                            float2 texPerUvX, float2 texPerUvY)
+{
+    return codexMarkerDecode(shaderTexture.Sample(samplerState,
+        screenToTex(TOKEN_DATA_UV_TOP, pixelUv, pixelTex, texPerUvX, texPerUvY)).rgb);
+}
+
+float tokenFallbackLevel()
+{
+    if (TOKEN_LEVEL_TARGET >= 0.0)
+    {
+        float from = TOKEN_LEVEL_FROM >= 0.0 ? TOKEN_LEVEL_FROM : TOKEN_LEVEL;
+        float p = TOKEN_GLIDE_DURATION <= 0.0
+                ? 1.0
+                : smootherstep01((Time - TOKEN_GLIDE_START) / TOKEN_GLIDE_DURATION);
+        return lerp(from, TOKEN_LEVEL_TARGET, p);
+    }
+    return TOKEN_LEVEL;
 }
 
 // ------------------------------------------------------------------- image --
@@ -409,16 +529,35 @@ float4 main(float4 pos : SV_POSITION, float2 tex : TEXCOORD) : SV_TARGET
     }
     else
     {
-        float live = -1.0;
-        if (SIZE_MODE != MODE_DEMO && TOKEN_LEVEL < 0.0)
-            live = tokenLevel(uv, tex, texPerUvX, texPerUvY);
-        float lvl = (SIZE_MODE == MODE_DEMO)
-                  ? demoLvl
-                  : (TOKEN_LEVEL >= 0.0 ? TOKEN_LEVEL : live);
+        float fallback = tokenFallbackLevel();
+        float lvl = demoLvl;
+        float motionWeight = 1.0;
+        if (SIZE_MODE != MODE_DEMO)
+        {
+            float2 markerData = tokenCodexMarkerData(uv, tex, texPerUvX, texPerUvY);
+            lvl = markerData.x;
+            motionWeight = markerData.y;
+        }
+        if (SIZE_MODE != MODE_DEMO && lvl < 0.0)
+        {
+            lvl = fallback;
+            motionWeight = 1.0;
+        }
+        if (SIZE_MODE != MODE_DEMO && lvl < 0.0)
+        {
+            lvl = tokenLevel(uv, tex, texPerUvX, texPerUvY);
+            motionWeight = 1.0;
+        }
         if (lvl < 0.0)
             return float4(shaderTexture.Sample(samplerState, tex).rgb, 1.0);
 
         float g = pow(clamp(lvl, 0.0, 1.0), TOKEN_EASE);
+        if (SIZE_MODE == MODE_TOKENS)
+        {
+            L = tokenLook(g);
+            rin = max(L.inner, 1.6);
+            rout = max(L.outer, rin + 0.5);
+        }
         I = lerp(0.10, 1.0, g);
         float rhMin = sqrt(TOKEN_AREA_MIN * aspect / 3.1415927);
         float rhMax = sqrt(TOKEN_AREA_MAX * aspect / 3.1415927);
@@ -438,16 +577,25 @@ float4 main(float4 pos : SV_POSITION, float2 tex : TEXCOORD) : SV_TARGET
         float2 wobAmp = min(float2(0.010 + 0.030 * g, 0.010 + 0.030 * g),
                             max(room * 0.35, float2(0.006, 0.006)));
         float2 ampEff = max(room - wobAmp, float2(0.0, 0.0));
-        float2 wander = lerp(lissa(t * TOKEN_CALM), lissa(t * TOKEN_RUSH), g);
-        float2 wobble = float2(cos(t * 0.8), sin(t * 1.0));
+        float2 wander;
+        float2 wobble;
         if (SIZE_MODE == MODE_DEMO)
         {
             float a = demoPhase();
             wander = demoLoopWander();
             wobble = float2(cos(a), sin(a));
         }
-        center = (lo + hi) * 0.5 + wander * ampEff
-               + wobAmp * wobble;
+        else
+        {
+            float a = tokenLoopPhase();
+            float2 calmWander = tokenLoopWander(a * TOKEN_CALM_TURNS);
+            float2 rushWander = tokenLoopWander(a * TOKEN_RUSH_TURNS);
+            wander = lerp(calmWander, rushWander, g);
+            wobble = tokenLoopWobble(a);
+        }
+        float2 pathOffset = wander * ampEff + wobAmp * wobble;
+        float motionBlend = smootherstep01(motionWeight);
+        center = (lo + hi) * 0.5 + pathOffset * motionBlend;
     }
 
     float vis = smoothstep(0.0, 0.10, I);

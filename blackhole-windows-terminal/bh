@@ -19,6 +19,9 @@ case "$mode" in
   demo|token|tokens|pomodoro|clock|timer|mode|status|current)
     exec node "$script_dir/bh-mode.js" "$mode" --open
     ;;
+  watch|token-watch|level-watch)
+    exec node "$script_dir/blackhole-statusline.js" level-watch
+    ;;
   codex)
     shift || true
     exec node "$script_dir/bh-mode.js" open-codex "$@"
@@ -35,6 +38,7 @@ case "$mode" in
 Usage:
   bh demo       Install demo shader and open a new Blackhole tab.
   bh token      Install token shader and open a new Blackhole tab.
+  bh watch      Run token watcher in the current Blackhole tab.
   bh pomodoro   Install pomodoro shader and open a new Blackhole tab.
   bh clock      Alias of bh pomodoro.
   bh mode       Print the installed shader path and last requested mode.
@@ -51,5 +55,5 @@ EOF
     ;;
 esac
 
-node "$script_dir/bh-mode.js" token >/dev/null
+node "$script_dir/bh-mode.js" prepare-codex >/dev/null
 exec node "$supervisor" "$@"

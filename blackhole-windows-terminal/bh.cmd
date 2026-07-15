@@ -28,6 +28,12 @@ if "%MODE%"=="" (
   goto run_mode
 ) else if /I "%MODE%"=="current" (
   goto run_mode
+) else if /I "%MODE%"=="watch" (
+  goto run_watch
+) else if /I "%MODE%"=="token-watch" (
+  goto run_watch
+) else if /I "%MODE%"=="level-watch" (
+  goto run_watch
 ) else if /I "%MODE%"=="claude" (
   set "SKIP_FIRST=1"
 ) else if /I "%MODE%"=="codex" (
@@ -65,6 +71,10 @@ goto usage_error
 node "%TOOL_DIR%bh-mode.js" %MODE% --open
 exit /b %ERRORLEVEL%
 
+:run_watch
+node "%TOOL_DIR%blackhole-statusline.js" level-watch
+exit /b %ERRORLEVEL%
+
 :run_claude
 node "%TOOL_DIR%bh-mode.js" open-claude %BH_ARGS%
 exit /b %ERRORLEVEL%
@@ -84,7 +94,7 @@ node "%TOOL_DIR%bh-mode.js" open-codex %BH_ARGS%
 exit /b %ERRORLEVEL%
 
 :run_codex_inplace
-node "%TOOL_DIR%bh-mode.js" token >nul
+node "%TOOL_DIR%bh-mode.js" prepare-codex >nul
 set "WSL_CWD="
 for /f "usebackq delims=" %%I in (`C:\Windows\System32\wsl.exe -d Ubuntu --exec wslpath -a "%CD%" 2^>nul`) do set "WSL_CWD=%%I"
 if not defined WSL_CWD (
@@ -97,7 +107,7 @@ if not defined WSL_BH (
   echo Could not map bh script to WSL: %TOOL_DIR%bh
   exit /b 1
 )
-set "BH_WSLENV=CODEX_BLACKHOLE_MIN_LEVEL/u:CODEX_BLACKHOLE_TOKEN_MAX/u:CODEX_BLACKHOLE_INTERVAL_MS/u:BLACKHOLE_DEBUG_STDOUT/u"
+set "BH_WSLENV=CODEX_BLACKHOLE_MIN_LEVEL/u:CODEX_BLACKHOLE_TOKEN_MAX/u:CODEX_BLACKHOLE_INTERVAL_MS/u:CODEX_BLACKHOLE_REDRAW_MS/u:CODEX_BLACKHOLE_MARKER_MS/u:CODEX_BLACKHOLE_MOTION_XFADE_MS/u:CODEX_BLACKHOLE_MOTION_FADE_IN_MS/u:CODEX_BLACKHOLE_SPRING_BOUNCE/u:CODEX_BLACKHOLE_SPRING_MIN_SEC/u:CODEX_BLACKHOLE_SPRING_MAX_SEC/u:CODEX_BLACKHOLE_SPRING_RATE/u:CODEX_BLACKHOLE_SPRING_TIME_WARP/u:CODEX_BLACKHOLE_SPRING_VECTOR_BLEND/u:CODEX_BLACKHOLE_TRACE_FILE/u:BLACKHOLE_TOKEN_GLIDE_MIN_SEC/u:BLACKHOLE_TOKEN_GLIDE_MAX_SEC/u:BLACKHOLE_TOKEN_GLIDE_RATE/u:BLACKHOLE_DEBUG_STDOUT/u"
 if defined WSLENV (
   set "WSLENV=!WSLENV!:!BH_WSLENV!"
 ) else (
@@ -110,6 +120,7 @@ exit /b %ERRORLEVEL%
 echo Usage:
 echo   bh demo        Install demo shader and open a new Blackhole tab.
 echo   bh token       Install token shader and open a new Blackhole tab.
+echo   bh watch       Run token watcher in the current Blackhole tab.
 echo   bh pomodoro    Install pomodoro shader and open a new Blackhole tab.
 echo   bh clock       Alias of bh pomodoro.
 echo   bh mode        Print the installed shader path and last requested mode.
@@ -119,5 +130,5 @@ echo   bh codex       Open a new Blackhole tab running WSL Codex.
 exit /b 0
 
 :usage_error
-echo Usage: bh [demo^|token^|pomodoro^|clock^|mode^|claude^|codex]
+echo Usage: bh [demo^|token^|watch^|pomodoro^|clock^|mode^|claude^|codex]
 exit /b 2

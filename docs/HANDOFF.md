@@ -1,6 +1,6 @@
 # 会话交接记录
 
-文档日期：2026-07-02。
+文档日期：2026-07-15。
 
 ## 已完成能力
 
@@ -18,17 +18,51 @@
 - Claude Code bridge 自动安装到 Windows `~/.claude`，兼容 `/mnt/c/...` 和 `/c/...` bash 环境。
 - Claude Code 会校验 `session_id` 和 transcript 文件名，`new` 后不会继承旧 transcript 的大小。
 - 去除了可见橙色色块；当前兼容色块为近黑色。
-- 通过 shader `TOKEN_LEVEL` live0/live1 fallback 解决内容未填满窗口、滚动 scrollback 后黑洞消失的问题。
-- 通过 `blackhole-live-owner.json` 和旧 Codex beacon 清理，避免多个上下文写入者
-  抢同一个 runtime shader 导致黑洞反复变大变小。
+- Codex 使用逐标签页顶部单格 marker；手动 token/Claude 使用 shader `TOKEN_LEVEL`
+  live0/live1 fallback，避免会话未填满窗口或滚动后永久丢失黑洞。
+- `bh codex` 已改为逐标签页单 beacon 控制：`500ms` 采样上下文，目标变化时在进程内
+  计算阻尼弹簧与短尾矢量混合曲线，默认回弹强度 `0.0`，全程单调、无超调；小跨度
+  至少 `1.6` 秒，大跨度约 `6.0` 秒收敛。中途改变目标会继承当时的位置和速度。闭环
+  移动先用 `480ms` 淡出，大小/形态完成后再用 `2400ms` 淡入。大小阶段使用 11-bit
+  高精度等级，稳态使用兼容旧窗口的 8-bit 等级和 5-bit 移动权重；两种 packet 通过
+  magic 和反向校验区分。supervisor 在同步帧提交前写入 marker，并在安全输出块后补写。
+  该链路不重载 shader，也不触碰底部输入行。
+- 外层启动和标签页内 `prepare-codex` 都写入 `0.02` 可见地板，不会在 supervisor
+  启动前被手动 token 的 `TOKEN_LEVEL=-1` 覆盖。
+- 手动 `bh token` 和 Claude 保留单例 `level-glider` 兼容链路；独占 lock 和持锁后二次
+  PID 检查避免并发 statusLine/hook 创建多个写入者。
+- `level-watch` 只读 glider current 状态，并在 owner 变化后退出，不再用 10ms 周期
+  回写 JSON；旧 watcher 不会持续影响新的 Codex 会话。
+- Codex rollout 解析按文件大小和修改时间缓存，并优先读取实际 rollout；只有读取不到
+  有效等级时才查询 SQLite thread 状态。
+- `blackhole-live-owner.json` 只约束手动 token/Claude 的共享 runtime shader 写入；
+  Codex marker 属于标签页，多个 `bh codex` beacon 可独立运行、互不覆盖。
+- Windows Terminal 根配置启用 `experimental.rendering.forceFullRepaint=true`，Codex
+  marker 只传递等级和移动权重，shader `Time` 不依赖 marker 变化也能持续推进。
 - `demo`、`pomodoro` 等静态模式会交替写入 `blackhole_winterminal_<mode>_live0/1.hlsl`
   并切换 Windows Terminal profile，避免同一路径 shader 编译缓存导致旧效果残留。
+- `bh demo` 会运行隐藏 `demo-keepalive`，用近黑色全屏清屏触发整个 viewport 重绘，
+  避免终端内容静止时 Windows Terminal 暂停 shader 重绘导致大小看起来不变化。
 - Demo 回落阶段只缩小到 `DEMO_LEVEL_FLOOR`，形态参数、路径相位和吸积盘内部动画时间都保持末态。
-- 初始黑洞调小，移动速度调慢：
+- 初始黑洞调小，token 中心移动提速为原来的两倍并保持严格闭环；`DRIFT_SPEED`、
+  吸积盘内部动画和 demo 时间不变：
   - `TOKEN_AREA_MIN = 0.0030`
-  - `TOKEN_CALM = 0.0050`
-  - `TOKEN_RUSH = 0.1375`
+  - `TOKEN_LOOP_SEC = 240.0000`
+  - `TOKEN_CALM_TURNS = 1.0000`
+  - `TOKEN_RUSH_TURNS = 4.0000`
+  - `TOKEN_WOBBLE_X_TURNS = 15.0000`
+  - `TOKEN_WOBBLE_Y_TURNS = 19.0000`
+  - `DEMO_XFADE = 0.7200`
   - `DEMO_LEVEL_FLOOR = 0.0350`
+- token 路径在周期首尾的位置和一阶速度均闭合；runtime shader 切换时通过
+  `TOKEN_MOTION_TIME_OFFSET` 继承墙钟相位，不会跳回路径起点。
+- token 大小、活动范围、路径混合以及形态共用同一个弹簧等级 `g`。形态严格按
+  `demoTour(1) -> 2 -> 3 -> 4 -> 5 -> 6 -> 0` 依次贯穿全部 7 个唯一可见预设，每段覆盖
+  `temp`、`incl`、`roll`、`inner`、`outer`、`opac`、`dopp`、`beam`、`gain`、`contr`、
+  `wind`、`speed`、`expo`、`star` 全部 14 个 `DiskLook` 字段。
+- 旧的多格 token packet、底部 marker 和 Codex 重绘脉冲均已移除；Codex 只写一个
+  随终端行列动态定位的顶部近黑 marker，且 marker 与 TUI 输出由同一个 supervisor
+  串行写入；手动 token/Claude 保留各自兼容链路。
 - WSL 和 Windows 入口已改为按脚本所在目录自定位，适合打包迁移。
 - 最新复现归档跟踪在 `dist/win-ghostty-blackhole-repro-2026-07-01.*`，包含
   `ghostty-blackhole-src/`，可在新电脑离线运行严格 shader 校验。
@@ -48,6 +82,7 @@
 node --check blackhole-windows-terminal/blackhole-statusline.js
 node --check blackhole-windows-terminal/bh-mode.js
 node --check blackhole-windows-terminal/codex-blackhole-supervisor.js
+node blackhole-windows-terminal/codex-blackhole-supervisor.js --proxy-self-test
 bash -n blackhole-windows-terminal/bh
 bash -n blackhole-windows-terminal/claude-blackhole-statusline.sh
 node blackhole-windows-terminal/verify-blackhole-port.js
@@ -58,7 +93,7 @@ node blackhole-windows-terminal/verify-blackhole-port.js
 `verify-blackhole-port.js` 的通过输出应包含：
 
 ```text
-OK: 42 model constants, 4 local tuning constants, 55 formula anchors, and 14 host-adaptation anchors verified.
+OK: 41 model constants, 8 local tuning constants, 55 formula anchors, 35 host-adaptation anchors, 91 statusline anchors, 11 bh-mode anchors, 9 bh.cmd anchors, 11 supervisor anchors, 1 supervisor-proxy samples, 8 demo-tour presets, 7 token-look knots, 16 Codex-marker codec samples, 1 Codex-marker layout sample, 28 Codex-spring samples, and 5 token-loop samples verified.
 ```
 
 ## 注意事项
@@ -69,5 +104,6 @@ OK: 42 model constants, 4 local tuning constants, 55 formula anchors, and 14 hos
 - 不要直接手改 Windows Terminal `settings.json` 中的 live shader 路径；运行
   `bh token`、`bh pomodoro` 或 `bh mode` 让脚本维护。
 - 番茄钟/时钟模式只承诺视觉周期；Windows Terminal shader 无法原样实现系统时间
-  uniform、输入空闲检测、响铃、通知、弹窗或每标签页独立 shader 参数。
+  uniform、输入空闲检测、响铃、通知、弹窗或每标签页独立 shader 模式。Codex token
+  等级可通过每个标签页自己的顶部 marker 独立传递。
 - 视觉效果最终以真实 Windows Terminal 窗口确认。

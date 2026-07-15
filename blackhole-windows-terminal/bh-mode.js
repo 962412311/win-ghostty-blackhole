@@ -19,6 +19,7 @@ const toolDir = __dirname;
 const sourceShader = path.join(toolDir, 'blackhole_winterminal.hlsl');
 const wtProfileName = process.env.BLACKHOLE_WT_PROFILE || 'Blackhole';
 const defaultWindowsUser = 'YOUR_USER';
+const TOKEN_LOOP_SEC = 240.0;
 
 function windowsUser() {
   if (process.env.BLACKHOLE_WINDOWS_USER) return process.env.BLACKHOLE_WINDOWS_USER;
@@ -71,6 +72,12 @@ const runtimeShader = process.env.BLACKHOLE_SHADER_PATH || defaultRuntimeShader(
 const wtSettingsPath = process.env.BLACKHOLE_WT_SETTINGS || defaultSettingsPath();
 const statePath = path.join(path.dirname(runtimeShader), 'blackhole-live-mode.txt');
 const ownerPath = path.join(path.dirname(runtimeShader), 'blackhole-live-owner.json');
+const liveLevelPath = path.join(path.dirname(runtimeShader), 'blackhole-live-level.txt');
+const levelTargetPath = path.join(path.dirname(runtimeShader), 'blackhole-level-target.json');
+const levelCurrentPath = path.join(path.dirname(runtimeShader), 'blackhole-level-current.json');
+const levelGliderPath = path.join(path.dirname(runtimeShader), 'blackhole-level-glider.json');
+const levelGliderLockPath = path.join(path.dirname(runtimeShader), 'blackhole-level-glider.lock');
+const levelCommandPath = path.join(path.dirname(runtimeShader), 'blackhole-level-command.txt');
 const claudeDir = process.env.BLACKHOLE_CLAUDE_DIR || defaultClaudeDir();
 const claudeSettingsPath = process.env.BLACKHOLE_CLAUDE_SETTINGS || path.join(claudeDir, 'settings.json');
 const distro = process.env.BLACKHOLE_WSL_DISTRO || 'Ubuntu';
@@ -131,6 +138,11 @@ function quoteCmd(value) {
   return `"${String(value).replace(/"/g, '\\"')}"`;
 }
 
+function quoteCmdIfNeeded(value) {
+  const text = String(value);
+  return /\s/.test(text) ? quoteCmd(text) : text;
+}
+
 function shaderFloat(value) {
   return Number(value).toFixed(4);
 }
@@ -149,12 +161,24 @@ function localSecondsOfDay(date = new Date()) {
     + date.getMilliseconds() / 1000;
 }
 
+function tokenMotionTimeOffset(nowMs = Date.now()) {
+  const seconds = nowMs / 1000.0;
+  return ((seconds % TOKEN_LOOP_SEC) + TOKEN_LOOP_SEC) % TOKEN_LOOP_SEC;
+}
+
 function renderShader(define, mode) {
   const source = fs.readFileSync(sourceShader, 'utf8');
   let next = source.replace(/#define\s+SIZE_MODE\s+MODE_[A-Z]+/, `#define SIZE_MODE ${define}`);
   if (next === source && !source.includes(`#define SIZE_MODE ${define}`)) {
     console.error('Could not find SIZE_MODE define in shader source.');
     process.exit(1);
+  }
+
+  if (canonicalMode(mode) === 'token') {
+    next = next.replace(
+      /#define\s+TOKEN_MOTION_TIME_OFFSET\s+[-+]?\d+(?:\.\d+)?/,
+      `#define TOKEN_MOTION_TIME_OFFSET ${shaderFloat(tokenMotionTimeOffset())}`,
+    );
   }
 
   if (canonicalMode(mode) === 'pomodoro') {
@@ -169,6 +193,15 @@ function renderShader(define, mode) {
 
   return next;
 }
+
+function seedTokenFallback(text) {
+  return text
+    .replace(/#define\s+TOKEN_LEVEL\s+-?\d+(?:\.\d+)?/, '#define TOKEN_LEVEL 0.0200')
+    .replace(/#define\s+TOKEN_LEVEL_FROM\s+-?\d+(?:\.\d+)?/, '#define TOKEN_LEVEL_FROM 0.0200')
+    .replace(/#define\s+TOKEN_LEVEL_TARGET\s+-?\d+(?:\.\d+)?/, '#define TOKEN_LEVEL_TARGET 0.0200')
+    .replace(/#define\s+TOKEN_GLIDE_DURATION\s+-?\d+(?:\.\d+)?/, '#define TOKEN_GLIDE_DURATION 0.0000');
+}
+
 
 function loadWtSettings() {
   if (!fs.existsSync(wtSettingsPath)) return null;
@@ -185,6 +218,12 @@ function currentWtShaderPath() {
   const settings = loadWtSettings();
   const profile = settings ? findBlackholeProfile(settings) : null;
   return profile?.['experimental.pixelShaderPath'] || '';
+}
+
+function writeWtSettings(settings) {
+  const tmp = `${wtSettingsPath}.tmp-${process.pid}`;
+  fs.writeFileSync(tmp, `${JSON.stringify(settings, null, 4)}${os.EOL}`);
+  fs.renameSync(tmp, wtSettingsPath);
 }
 
 function staticModeShaderPath(mode) {
@@ -209,13 +248,64 @@ function updateWtProfile(shaderPath) {
   }
 
   const nextPath = toWindowsPath(shaderPath);
-  if (profile['experimental.pixelShaderPath'] === nextPath) return false;
+  let changed = false;
+  if (settings['experimental.rendering.forceFullRepaint'] !== true) {
+    settings['experimental.rendering.forceFullRepaint'] = true;
+    changed = true;
+  }
+  if (profile['experimental.pixelShaderPath'] !== nextPath) {
+    profile['experimental.pixelShaderPath'] = nextPath;
+    changed = true;
+  }
+  if (!changed) return false;
 
-  profile['experimental.pixelShaderPath'] = nextPath;
-  const tmp = `${wtSettingsPath}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, `${JSON.stringify(settings, null, 4)}${os.EOL}`);
-  fs.renameSync(tmp, wtSettingsPath);
+  writeWtSettings(settings);
   return true;
+}
+
+function windowsNodePath() {
+  if (process.env.BLACKHOLE_NODE_EXE) return process.env.BLACKHOLE_NODE_EXE;
+  try {
+    const out = childProcess.execFileSync(
+      'cmd.exe',
+      ['/d', '/c', 'where node'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 1000 },
+    ).trim().split(/\r?\n/)[0];
+    if (out) return out;
+  } catch {}
+  return 'node';
+}
+
+function quoteWinArg(value) {
+  return `"${String(value).replace(/"/g, '""')}"`;
+}
+
+function modeCommandline(mode) {
+  const name = canonicalMode(mode);
+  if (name !== 'demo' && name !== 'token') {
+    return `C:\\Windows\\System32\\cmd.exe /d /k "set PATH=${toWindowsPath(toolDir)};%PATH%"`;
+  }
+  const helper = toWindowsPath(path.join(toolDir, 'blackhole-statusline.js'));
+  const helperMode = name === 'demo' ? 'demo-keepalive' : 'level-watch';
+  return `C:\\Windows\\System32\\cmd.exe /d /q /k call ${quoteWinArg(windowsNodePath())} ${quoteWinArg(helper)} ${helperMode}`;
+}
+
+function updateWtProfileCommandline(commandline) {
+  const settings = loadWtSettings();
+  if (!settings) return false;
+  const profile = findBlackholeProfile(settings);
+  if (!profile) return false;
+  if (profile.commandline === commandline) return false;
+  profile.commandline = commandline;
+  writeWtSettings(settings);
+  return true;
+}
+
+function waitForWtSettingsReload() {
+  const delayMs = Math.max(0, Math.round(envNumber('BLACKHOLE_WT_SETTINGS_RELOAD_MS', 2000)));
+  if (delayMs <= 0) return;
+  const signal = new Int32Array(new SharedArrayBuffer(4));
+  Atomics.wait(signal, 0, 0, delayMs);
 }
 
 function saveState(mode) {
@@ -223,6 +313,25 @@ function saveState(mode) {
     fs.mkdirSync(path.dirname(statePath), { recursive: true });
     fs.writeFileSync(statePath, `${mode}${os.EOL}`);
   } catch {}
+}
+
+function readJsonFile(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function isProcessAlive(pid) {
+  const n = Number(pid);
+  if (!Number.isInteger(n) || n <= 0 || n === process.pid) return false;
+  try {
+    process.kill(n, 0);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function claimLiveOwner(label) {
@@ -248,60 +357,32 @@ function readState() {
   }
 }
 
-function stopLocalCodexBeacons() {
-  let out = '';
-  try {
-    out = childProcess.execFileSync('ps', ['-eo', 'pid=,args='], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-      timeout: 1000,
-    });
-  } catch {
-    return;
+function stopLocalLevelGlider() {
+  try { fs.unlinkSync(liveLevelPath); } catch {}
+  try { fs.unlinkSync(levelTargetPath); } catch {}
+  try { fs.unlinkSync(levelCurrentPath); } catch {}
+  try { fs.unlinkSync(levelGliderLockPath); } catch {}
+  try { fs.unlinkSync(levelCommandPath); } catch {}
+  const info = readJsonFile(levelGliderPath);
+  if (info && isProcessAlive(info.pid)) {
+    try { process.kill(Number(info.pid), 'SIGTERM'); } catch {}
   }
-
-  for (const line of out.split('\n')) {
-    const match = line.trim().match(/^(\d+)\s+(.+)$/);
-    if (!match) continue;
-    const pid = Number(match[1]);
-    const args = match[2];
-    if (!Number.isInteger(pid) || pid === process.pid) continue;
-    if (!/blackhole-statusline\.js\s+codex-beacon/.test(args)) continue;
-    try {
-      process.kill(pid, 'SIGTERM');
-    } catch {}
-  }
+  try { fs.unlinkSync(levelGliderPath); } catch {}
 }
 
-function stopStaleCodexBeacons() {
-  if (process.env.BLACKHOLE_KEEP_OLD_BEACONS === '1') return;
-  if (process.platform !== 'win32') {
-    stopLocalCodexBeacons();
-    return;
-  }
-  try {
-    childProcess.spawnSync(
-      'C:\\Windows\\System32\\wsl.exe',
-      [
-        '-d', distro,
-        '--exec',
-        'sh',
-        '-lc',
-        "ps -eo pid=,args= | awk '/blackhole-statusline[.]js codex-beacon/ {print $1}' | xargs -r kill -TERM",
-      ],
-      { stdio: 'ignore', timeout: 1500 },
-    );
-  } catch {}
+function stopRuntimeHelpers() {
+  stopLocalLevelGlider();
 }
 
 function installMode(mode, ownerLabel = mode) {
-  stopStaleCodexBeacons();
   const ownerId = claimLiveOwner(ownerLabel);
+  stopRuntimeHelpers();
   const define = modes.get(mode);
-  const text = renderShader(define, mode);
-  const activeShader = canonicalMode(mode) === 'token'
-    ? runtimeShader
-    : staticModeShaderPath(mode);
+  let text = renderShader(define, mode);
+  if (canonicalMode(mode) === 'token' && ownerLabel !== 'token') {
+    text = seedTokenFallback(text);
+  }
+  const activeShader = staticModeShaderPath(mode);
   fs.mkdirSync(path.dirname(runtimeShader), { recursive: true });
   fs.writeFileSync(runtimeShader, text);
   if (activeShader !== runtimeShader) fs.writeFileSync(activeShader, text);
@@ -395,12 +476,15 @@ function openWt(args) {
 }
 
 function openBlackholeTab(mode) {
-  openWt([
+  updateWtProfileCommandline(modeCommandline(mode));
+  waitForWtSettingsReload();
+  const args = [
     '-w', '0',
     'new-tab',
     '-p', wtProfileName,
     '--title', `Blackhole ${mode}`,
-  ]);
+  ];
+  openWt(args);
 }
 
 function windowsCwdToWsl(cwd) {
@@ -481,6 +565,12 @@ if (cmd === 'install-claude' || cmd === 'install-claude-bridge') {
 if (cmd === 'open-codex') {
   openCodex(process.argv.slice(3));
   console.log('Blackhole tool: codex');
+  console.log(toWindowsPath(runtimeShader));
+  process.exit(0);
+}
+
+if (cmd === 'prepare-codex') {
+  installMode('token', 'codex-session');
   console.log(toWindowsPath(runtimeShader));
   process.exit(0);
 }

@@ -1,6 +1,6 @@
 # 复现归档清单
 
-文档日期：2026-07-02。
+文档日期：2026-07-15。
 
 归档包目标：把当前可复用内容打包，便于另一台 Windows + WSL 电脑快速复现。
 
@@ -31,6 +31,9 @@ Git 仓库跟踪最新复现包：
 - `*.pyc`
 - Windows Terminal 运行时生成的 `blackhole_winterminal*_live0/1.hlsl`
 - Windows Terminal 运行时生成的 `blackhole-live-level.txt`
+- Windows Terminal 运行时生成的 `blackhole-live-owner.json`
+- Windows Terminal 运行时生成的 `blackhole-level-*.json` 和
+  `blackhole-level-glider.lock`、`blackhole-level-command.txt`
 
 ## 生成命令
 
@@ -47,7 +50,7 @@ bash scripts/package-repro.sh
 ls -lh dist/
 cd dist
 sha256sum -c win-ghostty-blackhole-repro-2026-07-01.sha256
-tar -tzf win-ghostty-blackhole-repro-2026-07-01.tar.gz | rg '(^\./\.git/|/\.git/|^\./dist/|__pycache__|\.pyc$)' || true
+tar -tzf win-ghostty-blackhole-repro-2026-07-01.tar.gz | rg '(^\./\.git/|/\.git/|^\./dist/|__pycache__|\.pyc$|blackhole_winterminal.*_live[01]\.hlsl|blackhole-live-(level|owner)|blackhole-level-(target|current|glider|command))' || true
 ```
 
 最后一条命令不应输出任何条目。

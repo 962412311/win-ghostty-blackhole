@@ -1,6 +1,7 @@
-// 将此片段合并到 Windows Terminal settings.json -> profiles -> defaults。
-// 操作路径：Settings -> Open JSON file，然后合并下面的字段。
+// 将根字段合并到 settings.json 根节点，将 profile 字段合并到 profiles -> defaults。
+// 操作路径：Settings -> Open JSON file。
 {
+  "experimental.rendering.forceFullRepaint": true,
   "profiles": {
     "defaults": {
       "experimental.pixelShaderPath": "C:\\Users\\YOUR_USER\\terminal-shaders\\blackhole_winterminal.hlsl",
